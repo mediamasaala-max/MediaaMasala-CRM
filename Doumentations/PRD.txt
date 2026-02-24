@@ -23,15 +23,15 @@ A web-based CRM to manage:
 
 
 
-## PHASE 1: FOUNDATION + LEADS + TASKS (2 months)
+## PHASE 1: FOUNDATION + LEADS + TASKS (COMPLETE)
 
-### What We're Building in Phase 1
-1. User login system
+### What We Built in Phase 1
+1. User login system (JWT-based)
 2. Basic employee management
-3. **Leads module (COMPLETE)**
-4. **Tasks module (COMPLETE)**
-5. Simple role-based permissions
-6. Basic dashboard
+3. **Leads module**: Pipelines, conversion, and follow-ups.
+4. **Tasks module**: Assignments, priorities, and linking to leads/projects/products.
+5. Simple role-based permissions (Centralized in PRISMA).
+6. Basic dashboard with KPI stats.
 
 ### Why This Order?
 - Leads & Tasks are urgent priority
@@ -656,45 +656,25 @@ Navigation Menu (shows based on permissions):
 
 ---
 
-## PHASE 2: PROJECTS + EOD + ATTENDANCE (2 months)
+## PHASE 2: PROJECTS + EOD + ATTENDANCE (COMPLETE)
 
-### What We're Building
-1. Projects module (client projects)
-2. Products module (internal products)
-3. EOD (End of Day reports)
-4. Attendance (check-in/check-out)
-5. Leave management
-6. Notifications
-
-### Timeline
-- Week 5-6: Projects module
-- Week 7-8: Products module
-- Week 9: EOD module
-- Week 10: Attendance & Leave
-- Week 11-12: Notifications & Polish
-
-**Detailed breakdown provided after Phase 1 completion**
+### What We Built
+1. Projects module (linked to Leads)
+2. Products module (catalog with manager-scoping)
+3. EOD (Automated Task/Lead counting)
+4. Attendance (Server-side IP/Timestamp validation)
+5. Leave management (Approvals & Balancing)
+6. Activity Logs (Audit Trail)
 
 ---
 
-## PHASE 3: ADVANCED FEATURES (2 months)
+## PHASE 3: ADVANCED FEATURES & SECURITY (IN PROGRESS)
 
-### What We're Building
-1. Employees management
-2. Departments management (Admin can create)
-3. Role Permission Matrix (Admin can customize)
-4. Reports & Analytics
-5. File uploads
-6. Email notifications
-
-### Timeline
-- Week 13-14: Employees & Departments
-- Week 15-16: Role Permission Matrix UI
-- Week 17-18: Reports
-- Week 19-20: Testing & Bug fixes
-- Week 21-24: Polish, deployment, training
-
-**Detailed breakdown provided after Phase 2 completion**
+### System Hardening & Audit (Feb 2026)
+- **Unified RBAC**: Implemented `getModuleWhereClause` for all modules to eliminate manual scope checks.
+- **Backend Robustness**: Standardized all controllers with `safeHandler` for unified error responses.
+- **Data Privacy**: Restricted API responses via central `selectUtils.ts` to prevent data leakage.
+- **Frontend CX**: Introduced `PageSkeleton` architecture for premium UX on slow connections.
 
 ---
 
@@ -944,6 +924,31 @@ GET    /api/employees              - Get team members (for dropdowns)
 - [ ] Can create task
 - [ ] Can assign task to anyone
 
+### Phase 4: Critical System Hardening & Compliance (Feb 2026) [COMPLETE]
+**Objective**: Transition from a fast-feature build to a high-integrity architectural baseline.
+
+#### 1. Compliance: Soft-Delete & Audit Trails
+- **Problem**: Hard-deleting employees removed legal evidence (attendance, logs).
+- **Solution**: Implemented `isActive` flag for Employees. Logic replaces `prisma.delete` with `isActive: false`.
+- **Cascade Rule**: Modified schema to `RESTRICT` or `KEEP` logs when parent leads/employees are removed (Audit-proof).
+
+#### 2. Security: JWT Hygiene & RBAC Versioning
+- **Problem**: Changing a user's role didn't revoke old session permissions for 48h.
+- **Solution**: Added `roleVersion` to Roles. JWT now encodes this version.
+- **Enforcement**: Backend `/me` endpoint checks version; if role was modified, token is forcefully invalidated (TOKEN_STALE).
+
+#### 3. Data Integrity: Uniqueness & Concurrency
+- **Problem**: Race conditions allowed duplicate attendance or multiple projects per lead.
+- **Solution**: 
+    - `Attendance`: Multi-column unique constraint `[employeeId, date]`.
+    - `Project`: Unique index on `leadId`.
+    - `Employee`: Centralized Role/Department storage (removed from User model).
+
+#### 4. Architecture: Auth-Only User Model
+- **Refactoring**: The `User` model is now purely for Auth (email, hash). All business logic (Role, Dept) is strictly on the `Employee` profile, eliminating sync bugs.
+
+---
+
 **As Manager:**
 - [ ] Can login
 - [ ] Can see team leads only
@@ -966,5 +971,4 @@ GET    /api/employees              - Get team members (for dropdowns)
 - [ ] Can update own task status
 
 ---
-
-
+```

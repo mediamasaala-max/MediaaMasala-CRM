@@ -48,16 +48,20 @@ export const checkPermission = (module: string, action: string) => {
     }
 
     try {
-      // Fetch fresh permissions from database using the user's ID
+      // 1. Fetch fresh permissions via the Employee profile (Schema Audit 6)
       const dbUser = await prisma.user.findUnique({
         where: { id: user.id },
         select: {
-          isActive: true, // ENFORCED
-          role: {
+          isActive: true,
+          employee: {
             select: {
-              code: true,
-              permissions: {
-                include: { permission: true }
+              role: {
+                select: {
+                  code: true,
+                  permissions: {
+                    include: { permission: true }
+                  }
+                }
               }
             }
           }
@@ -68,24 +72,24 @@ export const checkPermission = (module: string, action: string) => {
           return res.status(401).json({ message: 'Account is disabled' });
       }
 
-      if (!dbUser.role) {
-        return next(new AppError('You do not have the necessary permissions to perform this action.', 403));
+      if (!dbUser.employee?.role) {
+        return next(new AppError('You do not have the necessary permissions to perform this action. No role assigned.', 403));
       }
 
-      // Re-check if role was updated to ADMIN after login
-      if (dbUser.role.code === 'ADMIN') {
+      // 2. Re-check if role was updated to ADMIN
+      if (dbUser.employee.role.code === 'ADMIN') {
         (req as any).permissionScope = 'all';
         return next();
       }
 
-      const freshPermissions = dbUser.role.permissions.map(rp => ({
+      const freshPermissions = dbUser.employee.role.permissions.map((rp: any) => ({
         module: rp.permission.module,
         action: rp.permission.action,
         scope: rp.permission.scopeType
       }));
 
       const relevantPermissions = freshPermissions.filter(
-        (p: any) => p.module === module && p.action === action
+        (p: any) => p.module === module && (p.action === action || (action === 'view' && p.action === 'read'))
       );
       
       if (relevantPermissions.length === 0) {

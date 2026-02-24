@@ -13,16 +13,20 @@ router.post('/login', async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
-        role: {
+        employee: {
           include: {
-            permissions: {
+            role: {
               include: {
-                permission: true
+                permissions: {
+                  include: {
+                    permission: true
+                  }
+                }
               }
-            }
+            },
+            department: true
           }
-        },
-        department: true
+        }
       }
     });
 
@@ -36,25 +40,25 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const employee = await prisma.employee.findUnique({ where: { userId: user.id } });
+    if (!user.employee) {
+      return res.status(403).json({ message: 'User account has no associated employee profile. Please contact admin.' });
+    }
 
     // Flatten permissions for the token/response
-    let permissions = user.role.permissions.map(rp => ({
+    let permissions = user.employee.role.permissions.map(rp => ({
       module: rp.permission.module,
       action: rp.permission.action,
       scope: rp.permission.scopeType
     }));
 
-    // For ADMIN, we might want to ensure they always get specific "admin-only" feel if needed
-    // but the middleware already handles the bypass.
-
     const token = jwt.sign(
       {
         id: user.id,
-        employeeId: employee?.id,
+        employeeId: user.employee.id,
         email: user.email,
-        role: user.role.code,
-        departmentId: user.departmentId,
+        role: user.employee.role.code,
+        roleVersion: user.employee.role.roleVersion,
+        departmentId: user.employee.departmentId,
         permissions: permissions
       },
       JWT_SECRET,
@@ -65,12 +69,17 @@ router.post('/login', async (req, res) => {
       token,
       user: {
         id: user.id,
-        employeeId: employee?.id,
-        employee: employee,
+        employeeId: user.employee.id,
+        employee: {
+          id: user.employee.id,
+          firstName: user.employee.firstName,
+          lastName: user.employee.lastName,
+          empId: user.employee.empId
+        },
         email: user.email,
-        name: user.email.split('@')[0], // Simplified name for now
-        role: user.role.code,
-        department: user.department.name
+        name: `${user.employee.firstName} ${user.employee.lastName}`,
+        role: user.employee.role.code,
+        department: user.employee.department.name
       },
       permissions
     });
@@ -81,19 +90,16 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, firstName, lastName } = req.body;
 
   try {
-    // 1. Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    // 2. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Get UNASSIGNED Role and Dept
     const [unassignedRole, unassignedDept] = await Promise.all([
       prisma.role.findUnique({ where: { code: 'UNASSIGNED' } }),
       prisma.department.findUnique({ where: { code: 'UNASSIGNED' } })
@@ -103,20 +109,40 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ message: 'Infrastructure error: Default roles missing' });
     }
 
-    // 4. Create User
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash: hashedPassword,
-        roleId: unassignedRole.id,
-        departmentId: unassignedDept.id,
-        isActive: true // User account exists but has no permissions
-      }
+    // Atomic creation of User and Employee
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          passwordHash: hashedPassword,
+          isActive: true
+        }
+      });
+
+      // Simple empId generator logic (could be improved)
+      const count = await tx.employee.count();
+      const empId = `EMP${String(count + 1).padStart(3, '0')}`;
+
+      const employee = await tx.employee.create({
+        data: {
+          empId,
+          userId: user.id,
+          firstName: firstName || email.split('@')[0],
+          lastName: lastName || '',
+          email,
+          roleId: unassignedRole.id,
+          departmentId: unassignedDept.id,
+          isActive: true
+        }
+      });
+
+      return { user, employee };
     });
 
     res.status(201).json({ 
-      message: 'Registration successful. Please contact an admin for role assignment.',
-      userId: user.id 
+      message: 'Registration successful. Profile created with default roles.',
+      userId: result.user.id,
+      employeeId: result.employee.id
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -137,23 +163,35 @@ router.get('/me', async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: {
-        role: {
+        employee: {
           include: {
-            permissions: {
-              include: { permission: true }
-            }
+            role: {
+              include: {
+                permissions: {
+                  include: { permission: true }
+                }
+              }
+            },
+            department: true
           }
-        },
-        department: true
+        }
       }
     });
 
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (!user.isActive) return res.status(401).json({ message: 'Account is disabled' });
+    if (!user.employee) return res.status(403).json({ message: 'No employee profile' });
 
-    const employee = await prisma.employee.findUnique({ where: { userId: user.id } });
+    // JWT Hygiene: Check Role Version
+    if (decoded.roleVersion !== undefined && user.employee.role.roleVersion !== decoded.roleVersion) {
+      return res.status(401).json({ 
+        message: 'Permissions updated. Please log in again.',
+        code: 'TOKEN_STALE',
+        refreshRequired: true 
+      });
+    }
 
-    const permissions = user.role.permissions.map(rp => ({
+    const permissions = user.employee.role.permissions.map(rp => ({
       module: rp.permission.module,
       action: rp.permission.action,
       scope: rp.permission.scopeType
@@ -162,11 +200,11 @@ router.get('/me', async (req, res) => {
     res.json({
       user: {
         id: user.id,
-        employeeId: employee?.id,
+        employeeId: user.employee.id,
         email: user.email,
-        name: user.email.split('@')[0],
-        role: user.role.code,
-        department: user.department.name
+        name: `${user.employee.firstName} ${user.employee.lastName}`,
+        role: user.employee.role.code,
+        department: user.employee.department.name
       },
       permissions
     });

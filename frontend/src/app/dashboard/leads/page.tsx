@@ -49,6 +49,7 @@ import {
 import { usePermissions } from "@/hooks/use-permissions"
 import { PermissionGuard } from "@/components/permission-guard"
 import { ManagementFilters } from "@/components/dashboard/management-filters"
+import { PageSkeleton } from "@/components/dashboard/page-skeleton"
 
 interface Lead {
   id: string
@@ -88,28 +89,6 @@ const getStatusColor = (status: string) => {
   }
 }
 
-function LeadsSkeleton({ view }: { view: ViewType }) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between pb-4 border-b border-border/40">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-9 w-32" />
-      </div>
-      <div className="flex gap-2">
-        <Skeleton className="h-9 w-64" />
-        <Skeleton className="h-9 w-32" />
-        <Skeleton className="h-9 w-32" />
-      </div>
-      <div className="border border-border/40 rounded-md">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex p-4 border-b border-border/10">
-            <Skeleton className="h-4 w-full" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export default function LeadsPage() {
   const { data: session, status } = useSession()
@@ -183,11 +162,7 @@ export default function LeadsPage() {
   }, [localLeads, searchTerm, selectedStatus])
 
   if (status === "loading" || isLoading || permissionsLoading) {
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <LeadsSkeleton view={view} />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   if (status === "unauthenticated") {

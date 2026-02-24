@@ -6,11 +6,11 @@ import {
   updateLead, 
   addLeadNote, 
   addFollowUp,
-  getEmployees,
   assignLead,
   deleteLead,
   convertToProject
 } from '../controllers/leadController';
+import { getEmployees } from '../controllers/adminController';
 import { authenticateToken, checkPermission } from '../middleware/auth';
 
 const router = express.Router();

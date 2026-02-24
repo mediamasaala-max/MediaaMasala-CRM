@@ -28,7 +28,7 @@ export async function getRecursiveReporteeIds(managerId: number): Promise<number
 /**
  * Builds a hierarchical tree of employees starting from a specific manager (or all if managerId is null).
  */
-export async function getEmployeeHierarchy(managerId: number | null = null) {
+export async function getEmployeeHierarchy(managerId: number | null = null, departmentId?: number) {
   let employeeIds: number[] | null = null;
 
   // If we have a managerId, only fetch their subtree to optimize performance
@@ -37,8 +37,12 @@ export async function getEmployeeHierarchy(managerId: number | null = null) {
     employeeIds = [managerId, ...reporteeIds];
   }
 
+  const where: any = {};
+  if (employeeIds) where.id = { in: employeeIds };
+  if (departmentId) where.departmentId = departmentId;
+
   const employees = await prisma.employee.findMany({
-    where: employeeIds ? { id: { in: employeeIds } } : {},
+    where,
     include: {
       role: { select: { name: true, code: true } },
       department: { select: { name: true, code: true } }

@@ -14,10 +14,19 @@ export async function getModuleWhereClause(
 
   const permissions = user.permissions || [];
   const permission = permissions.find(
-    (p: any) => p.module === moduleName && (p.action === action || (action === 'view' && p.action === 'read'))
+    (p: any) => p.module === moduleName && (
+      p.action === action || 
+      (action === 'view' && p.action === 'read') ||
+      (action === 'edit' && p.action === 'write') ||
+      (action === 'delete' && p.action === 'edit') // Often users with edit can delete, but check matrix
+    )
   );
 
   if (!permission) return null; // Explicitly deny if no permission
+
+  // PRODUCT HYGIENE: Products are global catalog. 
+  // View action is always 'all' scope regardless of initial assignment.
+  if (moduleName === 'products' && action === 'view') return {};
 
   const scope = permission.scope;
 
@@ -105,7 +114,7 @@ export async function getModuleWhereClause(
     if (moduleName === 'products') {
       return { 
         OR: [
-          { productManagerId: { not: null } }, // General access within dept? Or based on PM dept?
+          { productManager: { departmentId: user.departmentId } },
           { tasks: { some: { assigneeId: user.employeeId } } } // Implicit Inheritance
         ] 
       };

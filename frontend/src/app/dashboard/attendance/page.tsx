@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { PermissionGuard } from "@/components/permission-guard"
 import { useQuery } from "@tanstack/react-query"
 import { ManagementFilters } from "@/components/dashboard/management-filters"
+import { PageSkeleton } from "@/components/dashboard/page-skeleton"
 
 interface AttendanceRecord {
   id: number
@@ -121,204 +122,191 @@ export default function AttendancePage() {
 
   return (
     <PermissionGuard module="attendance">
-    <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border/40">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Attendance</h1>
-          <p className="text-muted-foreground text-sm font-medium">Track your daily presence and work hours.</p>
-        </div>
-        
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Date Filter */}
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex h-11 rounded-xl border border-border/40 bg-card px-4 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-sm cursor-pointer"
-            />
-            {selectedDate && (
-              <button
-                onClick={() => setSelectedDate("")}
-                className="h-11 px-3 rounded-xl border border-border/40 bg-card text-xs font-bold text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors shadow-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          {/* Management Filters */}
-          <ManagementFilters 
-            module="attendance"
-            selectedDept={selectedDeptId}
-            setSelectedDept={setSelectedDeptId}
-            selectedEmp={selectedEmployeeId}
-            setSelectedEmp={(id, recursive) => {
-                setSelectedEmployeeId(id);
-                setIsRecursive(recursive);
-            }}
-            isRecursive={isRecursive}
-          />
-
-          <div className="flex flex-col items-end px-4 border-r border-border/50">
-             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1">Status</span>
-             <Badge variant={activeRecord ? "success" : "secondary"} className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">
-               {activeRecord ? "Active" : "Logged Off"}
-             </Badge>
-          </div>
-          
-          {!activeRecord ? (
-            <Button onClick={handleCheckIn} loading={isCheckingIn} className="h-11 rounded-xl font-bold text-xs uppercase tracking-widest px-6 shadow-lg shadow-primary/10">
-              <CheckCircle2 className="mr-2 h-4 w-4" /> Clock In
-            </Button>
-          ) : (
-            <Button onClick={handleCheckOut} loading={isCheckingOut} variant="destructive" className="h-11 rounded-xl font-bold text-xs uppercase tracking-widest px-6 shadow-lg shadow-destructive/10">
-              <LogOut className="mr-2 h-4 w-4" /> Clock Out
-            </Button>
-          )}
-        </div>
-      </div>
-
-
-        {/* Loading Overlay */}
-        <div className={`transition-opacity duration-300 ${isFetching && !isLoading ? 'opacity-60 pointer-events-none relative' : ''}`}>
-          {isFetching && !isLoading && (
-            <div className="absolute inset-0 z-50 flex items-start justify-center pt-24">
-               <div className="bg-background/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-primary/20 flex items-center gap-2">
-                 <div className="h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                 <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Updating...</span>
-               </div>
-            </div>
-          )}
-
-      {/* Current Session Card */}
-      {activeRecord && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent shadow-xl overflow-hidden">
-          <CardHeader className="pb-3 border-b border-primary/10">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                Active Session
-              </CardTitle>
-              <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wider border-primary/30 bg-primary/10 text-primary">Live</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card/50 p-4 rounded-xl border border-border/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Check-In</span>
-                </div>
-                <p className="text-lg font-mono font-bold text-foreground tabular-nums">
-                  {new Date(activeRecord.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-              <div className="bg-card/50 p-4 rounded-xl border border-border/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Date</span>
-                </div>
-                <p className="text-lg font-bold text-foreground">
-                  {new Date(activeRecord.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                </p>
-              </div>
-            </div>
-            {activeRecord.location && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground/70 bg-muted/30 p-3 rounded-lg">
-                <MapPin className="h-3.5 w-3.5" />
-                <span className="font-medium">{activeRecord.location}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Attendance History */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-widest">History</h2>
-        </div>
-
+      <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12 p-6">
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-48 rounded-2xl bg-muted/20 animate-pulse border border-border/10" />
-            ))}
-          </div>
-        ) : filteredRecords.length === 0 ? (
-          <Card className="border-dashed py-12">
-            <CardContent className="flex flex-col items-center justify-center text-center">
-              <div className="h-12 w-12 rounded-full bg-muted/20 flex items-center justify-center mb-4">
-                <History className="h-6 w-6 text-muted-foreground/30" />
-              </div>
-              <h3 className="text-sm font-bold text-muted-foreground/40 uppercase tracking-[0.4em]">No Records</h3>
-              <p className="text-xs text-muted-foreground/60 mt-2">
-                  {selectedEmployeeId !== "all" 
-                    ? `No attendance records found for this selection.` 
-                    : "No attendance records found."}
-              </p>
-            </CardContent>
-          </Card>
+          <PageSkeleton />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredRecords.map((record) => (
-              <Card key={record.id} className="group border-border/40 hover:border-primary/20 transition-all overflow-hidden bg-card/50 backdrop-blur-sm">
-                <CardHeader className="pb-3 border-b border-border/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs font-bold text-foreground">
-                        {new Date(record.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <Badge 
-                      variant={record.status === 'Present' ? 'success' : record.status === 'Absent' ? 'destructive' : 'secondary'}
-                      className="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-sm"
+          <>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border/40">
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Attendance</h1>
+                <p className="text-muted-foreground text-sm font-medium">Track your daily presence and work hours.</p>
+              </div>
+              
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Date Filter */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="flex h-11 rounded-xl border border-border/40 bg-card px-4 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-sm cursor-pointer"
+                  />
+                  {selectedDate && (
+                    <button
+                      onClick={() => setSelectedDate("")}
+                      className="h-11 px-3 rounded-xl border border-border/40 bg-card text-xs font-bold text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors shadow-sm"
                     >
-                      {record.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-2 text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider">
-                      {record.employee?.firstName} {record.employee?.lastName}
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Management Filters */}
+                <ManagementFilters 
+                  module="attendance"
+                  selectedDept={selectedDeptId}
+                  setSelectedDept={setSelectedDeptId}
+                  selectedEmp={selectedEmployeeId}
+                  setSelectedEmp={(id, recursive) => {
+                      setSelectedEmployeeId(id);
+                      setIsRecursive(recursive);
+                  }}
+                  isRecursive={isRecursive}
+                />
+
+                <div className="flex flex-col items-end px-4 border-r border-border/50">
+                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1">Status</span>
+                   <Badge variant={activeRecord ? "success" : "secondary"} className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">
+                     {activeRecord ? "Active" : "Logged Off"}
+                   </Badge>
+                </div>
+                
+                {!activeRecord ? (
+                  <Button onClick={handleCheckIn} loading={isCheckingIn} className="h-11 rounded-xl font-bold text-xs uppercase tracking-widest px-6 shadow-lg shadow-primary/10">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Clock In
+                  </Button>
+                ) : (
+                  <Button onClick={handleCheckOut} loading={isCheckingOut} variant="destructive" className="h-11 rounded-xl font-bold text-xs uppercase tracking-widest px-6 shadow-lg shadow-destructive/10">
+                    <LogOut className="mr-2 h-4 w-4" /> Clock Out
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Current Session Card */}
+            {activeRecord && (
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent shadow-xl overflow-hidden">
+                <CardHeader className="pb-3 border-b border-primary/10">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      Active Session
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wider border-primary/30 bg-primary/10 text-primary">Live</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">In</p>
-                      <p className="text-sm font-mono font-bold text-foreground tabular-nums">
-                        {new Date(record.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <CardContent className="pt-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-card/50 p-4 rounded-xl border border-border/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Check-In</span>
+                      </div>
+                      <p className="text-lg font-mono font-bold text-foreground tabular-nums">
+                        {new Date(activeRecord.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">Out</p>
-                      <p className="text-sm font-mono font-bold text-foreground tabular-nums">
-                        {record.checkOut ? new Date(record.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    <div className="bg-card/50 p-4 rounded-xl border border-border/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Date</span>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {new Date(activeRecord.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                       </p>
                     </div>
                   </div>
-                  {record.location && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 bg-muted/20 p-2 rounded-lg">
-                      <MapPin className="h-3 w-3" />
-                      <span className="font-medium truncate">{record.location}</span>
+                  {activeRecord.location && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground/70 bg-muted/30 p-3 rounded-lg">
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span className="font-medium">{activeRecord.location}</span>
                     </div>
-                  )}
-                  {record.notes && (
-                    <p className="text-[11px] text-muted-foreground/70 italic line-clamp-2 leading-relaxed">
-                      &quot;{record.notes}&quot;
-                    </p>
                   )}
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            )}
+
+            {/* Attendance History */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-widest">History</h2>
+              </div>
+
+              {filteredRecords.length === 0 ? (
+                <Card className="border-dashed py-12">
+                  <CardContent className="flex flex-col items-center justify-center text-center">
+                    <div className="h-12 w-12 rounded-full bg-muted/20 flex items-center justify-center mb-4">
+                      <History className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                    <h3 className="text-sm font-bold text-muted-foreground/40 uppercase tracking-[0.4em]">No Records</h3>
+                    <p className="text-xs text-muted-foreground/60 mt-2">
+                        {selectedEmployeeId !== "all" 
+                          ? `No attendance records found for this selection.` 
+                          : "No attendance records found."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredRecords.map((record) => (
+                    <Card key={record.id} className="group border-border/40 hover:border-primary/20 transition-all overflow-hidden bg-card/50 backdrop-blur-sm">
+                      <CardHeader className="pb-3 border-b border-border/20">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs font-bold text-foreground">
+                              {new Date(record.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <Badge 
+                            variant={record.status === 'Present' ? 'success' : record.status === 'Absent' ? 'destructive' : 'secondary'}
+                            className="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-sm"
+                          >
+                            {record.status}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider">
+                            {record.employee?.firstName} {record.employee?.lastName}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">In</p>
+                            <p className="text-sm font-mono font-bold text-foreground tabular-nums">
+                              {new Date(record.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">Out</p>
+                            <p className="text-sm font-mono font-bold text-foreground tabular-nums">
+                              {record.checkOut ? new Date(record.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                        {record.location && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 bg-muted/20 p-2 rounded-lg">
+                            <MapPin className="h-3 w-3" />
+                            <span className="font-medium truncate">{record.location}</span>
+                          </div>
+                        )}
+                        {record.notes && (
+                          <p className="text-[11px] text-muted-foreground/70 italic line-clamp-2 leading-relaxed">
+                            &quot;{record.notes}&quot;
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
-      </div>
-    </div>
     </PermissionGuard>
   )
 }

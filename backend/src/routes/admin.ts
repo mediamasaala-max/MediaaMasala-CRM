@@ -3,7 +3,7 @@ import {
   getDepartments, createDepartment, updateDepartment,
   getRoles, createRole, updateRole,
   getAllPermissions, getRolePermissions, syncRolePermissions,
-  getEmployees, createEmployee, updateEmployee, getPendingUsers,
+  getEmployees, createEmployee, updateEmployee, deleteEmployee, getPendingUsers,
   getHierarchy,
   getPermissionMatrix
 } from '../controllers/adminController';
@@ -22,6 +22,7 @@ router.get('/hierarchy-tree', checkPermission('employees', 'view'), getHierarchy
 router.get('/pending-users', checkPermission('employees', 'manage'), getPendingUsers);
 router.post('/employees', checkPermission('employees', 'manage'), createEmployee);
 router.patch('/employees/:id', checkPermission('employees', 'edit'), updateEmployee);
+router.delete('/employees/:id', checkPermission('employees', 'manage'), deleteEmployee);
 
 // Departments
 router.get('/departments', checkPermission('employees', 'view'), getDepartments);

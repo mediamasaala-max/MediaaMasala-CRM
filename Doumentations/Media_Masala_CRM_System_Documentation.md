@@ -319,7 +319,9 @@ User Login Request
 | 1 | **CORS** | Restricts API access to allowed domains |
 | 2 | **JWT Verification** | Validates token signature and expiry |
 | 3 | **Permission Middleware** | Checks `module:action:scope` against JWT payload |
-| 4 | **Prisma Scoping** | Applies data-level WHERE clauses based on user scope |
+| 4 | **Unified RBAC (Backend)** | Uses `getModuleWhereClause` for standardized Prisma filters |
+| 5 | **Secure Handler** | `safeHandler` utility manage global error formatting/masking |
+| 6 | **selectUtils.ts** | Centralized data selects prevent PII/password leakage |
 
 ### 5.3 JWT Payload Structure
 
@@ -395,19 +397,14 @@ Every permission is a combination of three variables:
 
 ### 6.4 Scope Enforcement Logic
 
-```
-Scope: "own"
-  → WHERE ownerId = currentUser.employeeId
+The system utilizes a centralized helper `getModuleWhereClause(user, module, action)` located in `permissionUtils.ts`. This utility maps the user's `permissionScope` (OWN, TEAM, DEPARTMENT, ALL) directly to Prisma `where` clauses, ensuring consistent enforcement across all controllers and reports.
 
-Scope: "team"
-  → WHERE ownerId = currentUser.employeeId
-     OR ownerId IN (SELECT id FROM employees WHERE managerId = currentUser.employeeId)
-
-Scope: "department"
-  → WHERE departmentId = currentUser.departmentId
-
-Scope: "all"
-  → No WHERE filter (full access)
+```typescript
+// Conceptual implementation of getModuleWhereClause
+Scope: "own"        → { ownerId: currentUser.employeeId }
+Scope: "team"       → { ownerId: { in: [currentUser.employeeId, ...reportees] } }
+Scope: "department" → { departmentId: currentUser.departmentId }
+Scope: "all"        → {} // Full access
 ```
 
 ---
@@ -527,8 +524,8 @@ POST /api/auth/login
 
 | Method | Endpoint | Auth | Permission | Description |
 |--------|----------|------|------------|-------------|
-| `GET` | `/` | Yes | `products:view` | List active products |
-| `GET` | `/:id` | Yes | `products:view` | Get product details |
+| `GET` | `/` | Yes | `products:view` | List active products (uses `productSelect`) |
+| `GET` | `/:id` | Yes | `products:view` | Get product with manager and tasks |
 | `POST` | `/` | Yes | `products:create` | Create product |
 | `PUT` | `/:id` | Yes | `products:edit` | Update product |
 | `PATCH` | `/:id` | Yes | `products:delete` | Soft-delete (toggle `isActive`) |
@@ -772,6 +769,12 @@ All API calls go through a centralized `apiClient` utility that:
 - Triggers success toasts on mutating operations (POST, PUT, DELETE)
 - Shows granular error messages for 401 (Unauthorized), 403 (Forbidden), and 500 (Server Error)
 
+### 9.4 UI Patterns: Perceived Performance
+
+To ensure a premium feel on all connections, the CRM uses **Skeleton Loaders**.
+- **PageSkeleton**: A reusable component (`page-skeleton.tsx`) that generates an architectural blueprint of the page during data fetching.
+- **Atomic Skeletons**: Individual components for cards and table rows to minimize layout shift.
+
 ---
 
 ## 10. Deployment Guide
@@ -878,10 +881,39 @@ MediaaMasala-CRM/
 |-------------|--------|
 | JWT Permission Flattening | Eliminates DB lookup on every API call (~500ms saved) |
 | `Promise.all` Parallelization | Dashboard queries run concurrently (>60% faster) |
-| Lean `select` Statements | Only fetch required fields (reduced network payload) |
+| `selectUtils.ts` (NEW) | Leaner payloads and zero data leakage of sensitive PII |
+| `safeHandler` (NEW) | Standardized error management, preventing stack leakage |
+| `PageSkeleton` (NEW) | Improved perceived performance on high-latency networks |
+
+### System Hardening & Compliance (Audit 6)
+
+In February 2026, the system underwent a major hardening phase to ensure data integrity and compliance.
+
+#### 1. Soft-Delete Implementation
+To preserve audit trails, the `Employee` model now uses an `isActive` flag instead of hard-deletion.
+- **Effect**: Deleting an employee marks them as inactive but preserves their `Attendance`, `EOD`, and `ActivityLogs`.
+- **Ghost Access Prevention**: Soft-deleting an employee also deactivates their associated `User` record, preventing login.
+
+#### 2. RBAC Hygiene: Role Versioning
+The system now handles permission staleness via `roleVersion`.
+- **Mechanism**: Every `Role` has a `roleVersion` (Int). This version is embedded in the JWT at login.
+- **Enforcement**: If an admin updates a role (permissions or name), the `roleVersion` increments. The backend checks this in the `/me` endpoint and rejects stale tokens with a `TOKEN_STALE` code.
+
+#### 3. Data Integrity Constraints
+- **Attendance**: A unique constraint on `(employeeId, date)` prevents multiple attendance records for the same employee on the same day.
+- **Project Conversion**: The `Project.leadId` is now strictly `@unique` at the database level, preventing multiple projects from being spawned from a single lead.
+
+#### 4. Auth-Only User Model
+The `User` model has been decoupled from business logic. It now only stores authentication credentials.
+- **Centralization**: `roleId` and `departmentId` are stored exclusively on the `Employee` record.
+- **Logic**: All RBAC checks use the `Employee` context fetched via the `userId` in the token.
+
+| Optimization | Impact |
+|-------------|--------|
 | React Query Caching | Frontend caches API responses, reduces re-fetches |
 | Session-First Permissions | Frontend trusts JWT permissions, background-syncs from DB |
 
 ---
 
 *End of Document*
+```
