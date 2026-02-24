@@ -40,6 +40,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (!user.isActive) {
+      return res.status(401).json({ message: 'Account is deactivated. Please contact admin.' });
+    }
+
     if (!user.employee) {
       return res.status(403).json({ message: 'User account has no associated employee profile. Please contact admin.' });
     }
