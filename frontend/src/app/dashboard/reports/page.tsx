@@ -19,30 +19,42 @@ import {
   Clock, 
   Calendar,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  LayoutGrid
 } from "lucide-react"
+import { ManagementFilters } from "@/components/dashboard/management-filters"
+import { cn } from "@/lib/utils"
 
 type ReportType = 'sales' | 'productivity' | 'attendance'
 
 export default function ReportsPage() {
   const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<ReportType>('sales')
+  const [selectedDept, setSelectedDept] = useState("all")
+  const [selectedEmp, setSelectedEmp] = useState("all")
+  const [isRecursive, setIsRecursive] = useState(false)
+
+  const commonParams = {
+    ...(selectedDept !== 'all' && { departmentId: selectedDept }),
+    ...(selectedEmp !== 'all' && { employeeId: selectedEmp }),
+    recursive: String(isRecursive)
+  }
 
   const { data: salesData, isLoading: salesLoading } = useQuery({
-    queryKey: ['report-sales'],
-    queryFn: () => apiClient.get('/reports/sales'),
+    queryKey: ['report-sales', activeTab, commonParams],
+    queryFn: () => apiClient.get('/reports/sales', { params: commonParams }),
     enabled: activeTab === 'sales'
   })
 
   const { data: productivityData, isLoading: productivityLoading } = useQuery({
-    queryKey: ['report-productivity'],
-    queryFn: () => apiClient.get('/reports/productivity'),
+    queryKey: ['report-productivity', activeTab, commonParams],
+    queryFn: () => apiClient.get('/reports/productivity', { params: commonParams }),
     enabled: activeTab === 'productivity'
   })
 
   const { data: attendanceData, isLoading: attendanceLoading } = useQuery({
-    queryKey: ['report-attendance'],
-    queryFn: () => apiClient.get('/reports/attendance'),
+    queryKey: ['report-attendance', activeTab, commonParams],
+    queryFn: () => apiClient.get('/reports/attendance', { params: commonParams }),
     enabled: activeTab === 'attendance'
   })
 
@@ -50,24 +62,39 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/50 pb-6">
-        <div>
-          <h1 className="text-3xl font-black tracking-tighter text-foreground font-inter">System Reports</h1>
-          <p className="text-muted-foreground text-sm font-medium mt-1">
-            Comprehensive system reports and performance metrics.
-          </p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border/50 pb-8">
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-4xl font-black tracking-tighter text-foreground font-inter">System Reports</h1>
+            <p className="text-muted-foreground text-sm font-medium mt-1">
+              Comprehensive system reports and performance metrics.
+            </p>
+          </div>
+          
+          <ManagementFilters 
+            module="reports"
+            selectedDept={selectedDept}
+            setSelectedDept={setSelectedDept}
+            selectedEmp={selectedEmp}
+            setSelectedEmp={(id, recursive) => {
+              setSelectedEmp(id);
+              setIsRecursive(recursive);
+            }}
+            isRecursive={isRecursive}
+          />
         </div>
         
-        <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50">
+        <div className="flex bg-muted/30 p-1.5 rounded-xl border border-border/40 shadow-sm backdrop-blur-sm self-start">
           {(['sales', 'productivity', 'attendance'] as ReportType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all rounded-md ${
+              className={cn(
+                "px-6 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-lg",
                 activeTab === tab 
-                  ? 'bg-background text-foreground shadow-sm' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+                  ? "bg-background text-primary shadow-sm border border-border/20" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
             >
               {tab}
             </button>

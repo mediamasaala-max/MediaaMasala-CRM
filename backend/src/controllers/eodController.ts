@@ -12,6 +12,13 @@ export const submitEod = safeHandler(async (req: Request, res: Response) => {
     return res.status(403).json({ message: 'Employee profile required' });
   }
 
+  // SECURITY PATCH: Content Validation (Trust Boundary)
+  if (!content || content.trim().length < 20) {
+    return res.status(400).json({ 
+      message: 'EOD content is too short. Please provide a detailed summary of your day (min 20 characters).' 
+    });
+  }
+
   const eod = await prisma.eodReport.create({
     data: {
       content,

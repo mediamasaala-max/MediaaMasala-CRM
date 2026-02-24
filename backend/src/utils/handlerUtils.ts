@@ -15,9 +15,13 @@ export const safeHandler = (fn: Function) => {
       const statusCode = error.statusCode || 500;
       const message = error.message || 'An unexpected error occurred';
       
+      // SRE: Add retryable hint for transient errors
+      const isRetryable = statusCode === 503 || statusCode === 504 || statusCode === 429;
+
       // Prevent internal stack trace leakage in production
       res.status(statusCode).json({
         message,
+        retryable: isRetryable,
         error: process.env.NODE_ENV === 'development' ? error : undefined
       });
     }

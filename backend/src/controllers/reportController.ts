@@ -1,13 +1,62 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { getModuleWhereClause } from '../utils/permissionUtils';
+import { getRecursiveReporteeIds } from '../utils/userUtils';
 import { safeHandler } from '../utils/handlerUtils';
 
 export const getSalesReport = safeHandler(async (req: Request, res: Response) => {
   const user = (req as any).user;
+  const { departmentId, employeeId, recursive } = req.query;
+  const scope = (req as any).permissionScope;
 
-  const whereClause = await getModuleWhereClause(user, 'leads', 'view');
+  let whereClause = await getModuleWhereClause(user, 'leads', 'view');
   if (whereClause === null) return res.status(403).json({ message: 'Access denied' });
+
+  // Apply explicit hierarchy filters
+  if (departmentId) {
+    const targetDeptId = Number(departmentId);
+    if (scope === 'all') {
+      whereClause.owner = { ...whereClause.owner, departmentId: targetDeptId };
+    } else if ((scope === 'department' || scope === 'team') && targetDeptId === user.departmentId) {
+      whereClause.owner = { ...whereClause.owner, departmentId: targetDeptId };
+    }
+  }
+
+  if (employeeId) {
+    const targetEmpId = Number(employeeId);
+    const isRecursive = recursive === 'true';
+
+    if (scope === 'all') {
+      if (isRecursive) {
+        const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+        whereClause.ownerId = { in: [targetEmpId, ...reporteeIds] };
+      } else {
+        whereClause.ownerId = targetEmpId;
+      }
+    } else if (scope === 'department') {
+      const emp = await prisma.employee.findUnique({ where: { id: targetEmpId } });
+      if (emp && emp.departmentId === user.departmentId) {
+        if (isRecursive) {
+          const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          whereClause.ownerId = { in: [targetEmpId, ...reporteeIds] };
+        } else {
+          whereClause.ownerId = targetEmpId;
+        }
+      }
+    } else if (scope === 'team') {
+      const myReporteeIds = await getRecursiveReporteeIds(user.employeeId);
+      const teamIds = [user.employeeId, ...myReporteeIds];
+      if (teamIds.includes(targetEmpId)) {
+        if (isRecursive) {
+          const itsReporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          const allowedReporteeIds = itsReporteeIds.filter(id => teamIds.includes(id));
+          whereClause.ownerId = { in: [targetEmpId, ...allowedReporteeIds] };
+        } else {
+          whereClause.ownerId = targetEmpId;
+        }
+      }
+    }
+  }
 
   const leads = await prisma.lead.findMany({
     where: whereClause,
@@ -58,10 +107,57 @@ export const getSalesReport = safeHandler(async (req: Request, res: Response) =>
 
 export const getProductivityReport = safeHandler(async (req: Request, res: Response) => {
   const user = (req as any).user;
+  const { departmentId, employeeId, recursive } = req.query;
+  const scope = (req as any).permissionScope;
 
   // 1. Narrow down employees by attendance module scope (or similar)
-  const employeeWhere = await getModuleWhereClause(user, 'attendance', 'view'); // Using attendance as proxy for "viewing employees stats"
+  let employeeWhere: any = await getModuleWhereClause(user, 'attendance', 'view'); // Using attendance as proxy for "viewing employees stats"
   if (employeeWhere === null) return res.status(403).json({ message: 'Access denied' });
+
+  if (departmentId) {
+    const targetDeptId = Number(departmentId);
+    if (scope === 'all') {
+      employeeWhere.departmentId = targetDeptId;
+    } else if (targetDeptId === user.departmentId) {
+       employeeWhere.departmentId = targetDeptId;
+    }
+  }
+
+  if (employeeId) {
+    const targetEmpId = Number(employeeId);
+    const isRecursive = recursive === 'true';
+
+    if (scope === 'all') {
+      if (isRecursive) {
+        const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+        employeeWhere.id = { in: [targetEmpId, ...reporteeIds] };
+      } else {
+        employeeWhere.id = targetEmpId;
+      }
+    } else if (scope === 'department') {
+      const emp = await prisma.employee.findUnique({ where: { id: targetEmpId } });
+      if (emp && emp.departmentId === user.departmentId) {
+        if (isRecursive) {
+          const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          employeeWhere.id = { in: [targetEmpId, ...reporteeIds] };
+        } else {
+          employeeWhere.id = targetEmpId;
+        }
+      }
+    } else if (scope === 'team') {
+       const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
+       const teamIds = [user.employeeId, ...reporteeIds];
+       if (teamIds.includes(targetEmpId)) {
+          if (isRecursive) {
+             const itsReporteeIds = await getRecursiveReporteeIds(targetEmpId);
+             const allowedReporteeIds = itsReporteeIds.filter((id: number) => teamIds.includes(id));
+             employeeWhere.id = { in: [targetEmpId, ...allowedReporteeIds] };
+          } else {
+             employeeWhere.id = targetEmpId;
+          }
+       }
+    }
+  }
 
   const employees = await prisma.employee.findMany({
     where: employeeWhere,
@@ -135,9 +231,57 @@ export const getProductivityReport = safeHandler(async (req: Request, res: Respo
 
 export const getAttendanceReport = safeHandler(async (req: Request, res: Response) => {
   const user = (req as any).user;
+  const { departmentId, employeeId, recursive } = req.query;
+  const scope = (req as any).permissionScope;
 
-  const whereClause = await getModuleWhereClause(user, 'attendance', 'view');
+  let whereClause = await getModuleWhereClause(user, 'attendance', 'view');
   if (whereClause === null) return res.status(403).json({ message: 'Access denied' });
+
+  // Apply explicit hierarchy filters
+  if (departmentId) {
+    const targetDeptId = Number(departmentId);
+    if (scope === 'all') {
+      whereClause.employee = { ...whereClause.employee, departmentId: targetDeptId };
+    } else if ((scope === 'department' || scope === 'team') && targetDeptId === user.departmentId) {
+      whereClause.employee = { ...whereClause.employee, departmentId: targetDeptId };
+    }
+  }
+
+  if (employeeId) {
+    const targetEmpId = Number(employeeId);
+    const isRecursive = recursive === 'true';
+
+    if (scope === 'all') {
+      if (isRecursive) {
+        const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+        whereClause.employeeId = { in: [targetEmpId, ...reporteeIds] };
+      } else {
+        whereClause.employeeId = targetEmpId;
+      }
+    } else if (scope === 'department') {
+      const emp = await prisma.employee.findUnique({ where: { id: targetEmpId } });
+      if (emp && emp.departmentId === user.departmentId) {
+        if (isRecursive) {
+          const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          whereClause.employeeId = { in: [targetEmpId, ...reporteeIds] };
+        } else {
+          whereClause.employeeId = targetEmpId;
+        }
+      }
+    } else if (scope === 'team') {
+      const myReporteeIds = await getRecursiveReporteeIds(user.employeeId);
+      const teamIds = [user.employeeId, ...myReporteeIds];
+      if (teamIds.includes(targetEmpId)) {
+        if (isRecursive) {
+          const itsReporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          const allowedReporteeIds = itsReporteeIds.filter(id => teamIds.includes(id));
+          whereClause.employeeId = { in: [targetEmpId, ...allowedReporteeIds] };
+        } else {
+          whereClause.employeeId = targetEmpId;
+        }
+      }
+    }
+  }
 
   const records = await prisma.attendance.findMany({
     where: whereClause,

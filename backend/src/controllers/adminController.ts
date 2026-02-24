@@ -98,7 +98,7 @@ export const createEmployee = safeHandler(async (req: Request, res: Response) =>
           email,
           passwordHash: hashedPassword,
           isActive: true
-        }
+        } as any
       });
     }
 
@@ -443,7 +443,7 @@ export const updateRole = safeHandler(async (req: Request, res: Response) => {
       description, 
       isActive,
       departmentId: targetDeptId,
-      roleVersion: { increment: 1 } // Triggers JWT hygiene
+      roleVersion: { increment: 1 } as any // Triggers JWT hygiene
     }
   });
   res.json(role);
@@ -500,7 +500,7 @@ export const syncRolePermissions = async (req: Request, res: Response) => {
       // Bump roleVersion to force re-login for all users with this role
       prisma.role.update({
           where: { id: Number(roleId) },
-          data: { roleVersion: { increment: 1 } }
+          data: { roleVersion: { increment: 1 } as any }
       })
     ]);
 

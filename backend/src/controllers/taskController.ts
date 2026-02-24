@@ -162,6 +162,23 @@ export const createTask = safeHandler(async (req: Request, res: Response) => {
     }
   }
 
+  // SECURITY PATCH: Link Injection Validation (Scenario 4)
+  if (leadId) {
+    const leadScope = await getModuleWhereClause(user, 'leads', 'view');
+    const validLead = await prisma.lead.findFirst({ where: { id: String(leadId), ...leadScope } });
+    if (!validLead) return res.status(403).json({ message: 'Access denied: Linked lead is out of scope or does not exist' });
+  }
+  if (projectId) {
+    const projectScope = await getModuleWhereClause(user, 'projects', 'view');
+    const validProject = await (prisma as any).project.findFirst({ where: { id: Number(projectId), ...projectScope } });
+    if (!validProject) return res.status(403).json({ message: 'Access denied: Linked project is out of scope or does not exist' });
+  }
+  if (productId) {
+    // Products view is 'all' by design, but we check existence
+    const validProduct = await prisma.product.findUnique({ where: { id: Number(productId), isActive: true } });
+    if (!validProduct) return res.status(403).json({ message: 'Access denied: Linked product does not exist or is inactive' });
+  }
+
   // Ensure IDs are valid numbers or null
   const validProjectId = (projectId && !isNaN(Number(projectId))) ? Number(projectId) : null;
   const validProductId = (productId && !isNaN(Number(productId))) ? Number(productId) : null;
@@ -239,11 +256,16 @@ export const updateTask = safeHandler(async (req: Request, res: Response) => {
   });
   if (!existingTask) return res.status(404).json({ message: 'Task not found or access denied' });
 
-  const updateData: any = { ...rest };
+  // SECURITY PATCH: Strict Updates (Scenario 9) - Prevents hijacking owner/department fields
+  const { title, description, priority, assigneeId: newAssigneeId } = req.body;
+  const updateData: any = {};
+  if (title) updateData.title = title;
+  if (description !== undefined) updateData.description = description;
+  if (priority) updateData.priority = priority;
   if (dueDate) updateData.dueDate = new Date(dueDate);
 
   // RBAC: Assignment Scope Check
-  if (rest.assigneeId && Number(rest.assigneeId) !== existingTask.assigneeId) {
+  if (newAssigneeId && Number(newAssigneeId) !== existingTask.assigneeId) {
     const permissions = (req as any).user.permissions || [];
     const assignPerm = permissions.find((p: any) => p.module === 'tasks' && p.action === 'assign');
     
@@ -251,7 +273,7 @@ export const updateTask = safeHandler(async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Access denied: You do not have permission to assign tasks' });
     }
 
-    const targetAssigneeId = Number(rest.assigneeId);
+    const targetAssigneeId = Number(newAssigneeId);
     const assignScope = assignPerm.scope;
 
     if (assignScope === 'own' && targetAssigneeId !== user.employeeId) {
@@ -269,12 +291,16 @@ export const updateTask = safeHandler(async (req: Request, res: Response) => {
     if (assignScope === 'department') {
       const assigneeEmp = await prisma.employee.findUnique({ 
         where: { id: targetAssigneeId },
-        select: { departmentId: true }
+        select: { departmentId: true, isActive: true }
       });
-      if (!assigneeEmp || assigneeEmp.departmentId !== user.departmentId) {
+      if (!assigneeEmp) return res.status(404).json({ message: 'Assignee not found' });
+      if (!assigneeEmp.isActive) return res.status(400).json({ message: 'Cannot assign tasks to an inactive employee' });
+
+      if (assigneeEmp.departmentId !== user.departmentId) {
         return res.status(403).json({ message: 'Access denied: You can only assign tasks within your department' });
       }
     }
+    updateData.assigneeId = targetAssigneeId;
   }
 
   if (status) {

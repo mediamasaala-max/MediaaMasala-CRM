@@ -25,18 +25,37 @@ export const getAttendance = safeHandler(async (req: Request, res: Response) => 
 
   if (employeeId) {
     const targetEmpId = Number(employeeId);
+    const isRecursive = req.query.recursive === 'true';
+
     if (scope === 'all') {
-      whereClause.employeeId = targetEmpId;
+      if (isRecursive) {
+        const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+        whereClause.employeeId = { in: [targetEmpId, ...reporteeIds] };
+      } else {
+        whereClause.employeeId = targetEmpId;
+      }
     } else if (scope === 'department') {
       const emp = await prisma.employee.findUnique({ where: { id: targetEmpId } });
       if (emp && emp.departmentId === user.departmentId) {
-        whereClause.employeeId = targetEmpId;
+        if (isRecursive) {
+          const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          whereClause.employeeId = { in: [targetEmpId, ...reporteeIds] };
+        } else {
+          whereClause.employeeId = targetEmpId;
+        }
       }
     } else if (scope === 'team') {
-      const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
-      const teamIds = [user.employeeId, ...reporteeIds];
+      const myReporteeIds = await getRecursiveReporteeIds(user.employeeId);
+      const teamIds = [user.employeeId, ...myReporteeIds];
+
       if (teamIds.includes(targetEmpId)) {
-        whereClause.employeeId = targetEmpId;
+        if (isRecursive) {
+          const itsReporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          const allowedReporteeIds = itsReporteeIds.filter(id => teamIds.includes(id));
+          whereClause.employeeId = { in: [targetEmpId, ...allowedReporteeIds] };
+        } else {
+          whereClause.employeeId = targetEmpId;
+        }
       }
     }
   }
@@ -94,8 +113,8 @@ export const checkIn = safeHandler(async (req: Request, res: Response) => {
     data: {
       employeeId: user.employeeId,
       date: today,
-      location,
-      notes,
+      location: location ? String(location).trim() : null,
+      notes: notes ? String(notes).trim() : null,
       status: 'Present'
     }
   });

@@ -51,10 +51,11 @@ export function usePermissions() {
     hasModule,
     getModuleScope,
     role,
+    user: data?.user || user,
     isAdmin: role === 'ADMIN',
     refreshPermissions: refetch,
     permissions,
     isLoading: status === "loading" || isLoading
-  }), [hasPermission, hasModule, role, refetch, permissions, isLoading, status])
+  }), [hasPermission, hasModule, role, refetch, permissions, isLoading, status, data?.user, user])
 }
 

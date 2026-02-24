@@ -38,9 +38,16 @@ async function getAuthHeaders() {
 }
 
 export const apiClient = {
-  async get(endpoint: string, options: RequestInit = {}) {
+  async get(endpoint: string, options: RequestInit & { params?: Record<string, string> } = {}) {
     const headers = await getAuthHeaders()
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    let url = `${API_BASE_URL}${endpoint}`
+    
+    if (options.params) {
+      const searchParams = new URLSearchParams(options.params)
+      url += `?${searchParams.toString()}`
+    }
+
+    const response = await fetch(url, {
       ...options,
       headers: { ...headers, ...options.headers },
     })

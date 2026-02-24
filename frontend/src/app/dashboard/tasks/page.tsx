@@ -151,14 +151,14 @@ export default function TasksPage() {
   const { data: tasks = [], isLoading, isFetching, error: queryError } = useQuery<Task[]>({
     queryKey: ["tasks", activeTab, session?.user?.email, selectedDeptId, selectedEmployeeId, isRecursive],
     queryFn: async () => {
-      let endpoint = activeTab === 'my' ? "/tasks?filter=my&" : "/tasks?"
-      if (selectedDeptId !== 'all') endpoint += `departmentId=${selectedDeptId}&`
-      if (selectedEmployeeId !== 'all') {
-        endpoint += `assigneeId=${selectedEmployeeId}&`
-        if (isRecursive) endpoint += `recursive=true&`
+      const params: Record<string, string> = {
+        ...(activeTab === 'my' && { filter: 'my' }),
+        ...(selectedDeptId !== 'all' && { departmentId: selectedDeptId }),
+        ...(selectedEmployeeId !== 'all' && { assigneeId: selectedEmployeeId }),
+        recursive: String(isRecursive)
       }
       
-      const data = await apiClient.get(endpoint)
+      const data = await apiClient.get("/tasks", { params })
       return Array.isArray(data) ? data : (data.tasks || [])
     },
     enabled: status === "authenticated",

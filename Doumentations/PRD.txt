@@ -954,6 +954,15 @@ GET    /api/employees              - Get team members (for dropdowns)
 #### 4. Architecture: Auth-Only User Model
 - **Refactoring**: The `User` model is now purely for Auth (email, hash). All business logic (Role, Dept) is strictly on the `Employee` profile, eliminating sync bugs.
 
+#### 5. Hierarchy Intelligence: Unified Filtering (Audit 11 - COMPLETE)
+- **Recursive Expansion**: Standardized `recursive=true` logic across all primary modules. Expanding a manager's view now pulls all descendant reportee data (N-levels deep).
+- **Backend Standard**: Consistent use of `departmentId`, `employeeId` (or module-owner/assignee variants), and `recursive` parameters.
+- **Frontend UX Standard**: 
+    - Indented tree structure for employee selection.
+    - "My Team" quick-action button for instant supervisor-wide oversight.
+    - Department locking: Managers see their department context, but cannot switch; Admins retain global overrides.
+- **Resilient API**: Native query parameter support in `apiClient` to handle complex hierarchical state transitions smoothly.
+
 ---
 
 **As Manager:**

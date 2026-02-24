@@ -4,6 +4,11 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
 
 const router = express.Router();
+
+// SRE: Fail-fast if JWT_SECRET is missing (Scenario: Render/Vercel Cold Start / CI Mismatch)
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+    throw new Error('CRITICAL: JWT_SECRET environment variable is missing.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 router.post('/login', async (req, res) => {
@@ -37,6 +42,8 @@ router.post('/login', async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
+      // SRE: Artificial delay to frustrate automated brute force
+      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -61,7 +68,7 @@ router.post('/login', async (req, res) => {
         employeeId: user.employee.id,
         email: user.email,
         role: user.employee.role.code,
-        roleVersion: user.employee.role.roleVersion,
+        roleVersion: (user.employee.role as any).roleVersion,
         departmentId: user.employee.departmentId,
         permissions: permissions
       },
@@ -187,7 +194,7 @@ router.get('/me', async (req, res) => {
     if (!user.employee) return res.status(403).json({ message: 'No employee profile' });
 
     // JWT Hygiene: Check Role Version
-    if (decoded.roleVersion !== undefined && user.employee.role.roleVersion !== decoded.roleVersion) {
+    if (decoded.roleVersion !== undefined && (user.employee.role as any).roleVersion !== decoded.roleVersion) {
       return res.status(401).json({ 
         message: 'Permissions updated. Please log in again.',
         code: 'TOKEN_STALE',

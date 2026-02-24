@@ -123,21 +123,33 @@ export const getLeadById = safeHandler(async (req: Request, res: Response) => {
         },
         orderBy: { scheduledDate: 'asc' }
       },
-      tasks: {
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          dueDate: true,
-          priority: true
-        },
-        orderBy: { dueDate: 'asc' }
-      }
     }
   });
 
   if (!lead) {
     return res.status(404).json({ message: 'Sale not found or access denied' });
+  }
+
+  // SECURITY PATCH: Nested Relation Scoping (Scenario 10)
+  // Ensure the user only sees tasks they are permitted to view within the lead context
+  const taskScope = await getModuleWhereClause(user, 'tasks', 'view');
+  if (taskScope) {
+    (lead as any).tasks = await prisma.task.findMany({
+      where: {
+        AND: [
+          { relatedToLeadId: lead.id },
+          taskScope
+        ]
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        dueDate: true,
+        priority: true
+      },
+      orderBy: { dueDate: 'asc' }
+    });
   }
 
   // Fetch project separately if needed (to bypass relation lint)
@@ -157,6 +169,23 @@ export const createLead = safeHandler(async (req: Request, res: Response) => {
   // RBAC: Validate Department/Owner
   let finalDepartmentId = departmentId ? Number(departmentId) : user.departmentId;
   let finalOwnerId = req.body.ownerId ? Number(req.body.ownerId) : user.employeeId;
+
+  // SECURITY PATCH: Duplicate Lead Prevention (Scenario: Payload Tampering)
+  const existingDuplicate = await prisma.lead.findFirst({
+    where: {
+      OR: [
+        { email },
+        { phone: phone ? String(phone) : undefined }
+      ],
+      status: { not: 'Lost' } // Only check against active/pending leads
+    }
+  });
+
+  if (existingDuplicate) {
+    return res.status(400).json({ 
+      message: `A lead with this ${existingDuplicate.email === email ? 'email' : 'phone number'} already exists or is being pursued.` 
+    });
+  }
 
   if (scope === 'own') {
     finalDepartmentId = user.departmentId;
@@ -219,9 +248,19 @@ export const updateLead = safeHandler(async (req: Request, res: Response) => {
       ]
     }
   });
+
   if (!existingLead) return res.status(404).json({ message: 'Lead not found or access denied' });
 
-  const updateData: any = { ...rest };
+  // SECURITY PATCH: Strict Updates (Scenario 9)
+  const { name, email, phone, company, source, notes } = req.body;
+  const updateData: any = {};
+  if (name) updateData.name = name;
+  if (email) updateData.email = email;
+  if (phone !== undefined) updateData.phone = phone;
+  if (company !== undefined) updateData.company = company;
+  if (source) updateData.source = source;
+  if (notes !== undefined) updateData.notes = notes;
+
   if (status) {
     updateData.status = status;
     if (status === 'Lost') {
@@ -483,8 +522,8 @@ export const convertToProject = safeHandler(async (req: Request, res: Response) 
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  if (scope !== 'all') {
-    return res.status(403).json({ message: 'Access denied: Only users with ALL scope can convert leads to projects' });
+  if (scope !== 'all' && scope !== 'department') {
+    return res.status(403).json({ message: 'Access denied: Insufficient scope to convert leads to projects' });
   }
 
   const rbacWhere = await getModuleWhereClause(user, 'leads', 'edit');

@@ -27,18 +27,37 @@ export const getProjects = safeHandler(async (req: Request, res: Response) => {
 
   if (employeeId) {
     const targetEmpId = Number(employeeId);
+    const isRecursive = req.query.recursive === 'true';
+
     if (scope === 'all') {
-      whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+      if (isRecursive) {
+        const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+        whereClause.lead = { ...whereClause.lead, ownerId: { in: [targetEmpId, ...reporteeIds] } };
+      } else {
+        whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+      }
     } else if (scope === 'department') {
       const emp = await prisma.employee.findUnique({ where: { id: targetEmpId } });
       if (emp && emp.departmentId === user.departmentId) {
-        whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+        if (isRecursive) {
+          const reporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          whereClause.lead = { ...whereClause.lead, ownerId: { in: [targetEmpId, ...reporteeIds] } };
+        } else {
+          whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+        }
       }
     } else if (scope === 'team') {
-      const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
-      const teamIds = [user.employeeId, ...reporteeIds];
+      const myReporteeIds = await getRecursiveReporteeIds(user.employeeId);
+      const teamIds = [user.employeeId, ...myReporteeIds];
+
       if (teamIds.includes(targetEmpId)) {
-        whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+        if (isRecursive) {
+          const itsReporteeIds = await getRecursiveReporteeIds(targetEmpId);
+          const allowedReporteeIds = itsReporteeIds.filter(id => teamIds.includes(id));
+          whereClause.lead = { ...whereClause.lead, ownerId: { in: [targetEmpId, ...allowedReporteeIds] } };
+        } else {
+          whereClause.lead = { ...whereClause.lead, ownerId: targetEmpId };
+        }
       }
     }
   }
@@ -100,21 +119,32 @@ export const getProjectById = safeHandler(async (req: Request, res: Response) =>
           departmentId: true
         }
       },
-      tasks: {
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          dueDate: true
-        },
-        orderBy: { dueDate: 'asc' }
-      }
     }
   });
 
   if (!project) {
     return res.status(404).json({ message: 'Project not found or access denied' });
+  }
+
+  // SECURITY PATCH: Nested Relation Scoping (Scenario 10)
+  const taskScope = await getModuleWhereClause(user, 'tasks', 'view');
+  if (taskScope) {
+    (project as any).tasks = await prisma.task.findMany({
+      where: {
+        AND: [
+          { projectId: project.id },
+          taskScope
+        ]
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        dueDate: true
+      },
+      orderBy: { dueDate: 'asc' }
+    });
   }
 
   res.json(project);
@@ -140,16 +170,46 @@ export const updateProject = safeHandler(async (req: Request, res: Response) => 
       return res.status(404).json({ message: 'Project not found or access denied' });
   }
 
+  // SECURITY PATCH: Strict Updates (Scenario 9)
+  const updateData: any = {};
+  if (name) updateData.name = name;
+  if (description !== undefined) updateData.description = description;
+  if (status) updateData.status = status;
+
+  if (projectManagerId !== undefined) {
+      const pmId = projectManagerId ? Number(projectManagerId) : null;
+      // RBAC: If setting a PM, ensure they are in scope (reusing createProject logic pattern)
+      if (pmId) {
+          const scope = (req as any).permissionScope;
+          if (scope === 'team') {
+              const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
+              if (![user.employeeId, ...reporteeIds].includes(pmId)) return res.status(403).json({ message: 'Access denied: PM not in your team' });
+          } else if (scope === 'department') {
+              const pm = await prisma.employee.findUnique({ where: { id: pmId }, select: { departmentId: true } });
+              if (!pm || pm.departmentId !== user.departmentId) return res.status(403).json({ message: 'Access denied: PM from another department' });
+          }
+      }
+      updateData.projectManagerId = pmId;
+  }
+
+  if (relationshipManagerId !== undefined) {
+      const rmId = relationshipManagerId ? Number(relationshipManagerId) : null;
+      if (rmId) {
+          const scope = (req as any).permissionScope;
+          if (scope === 'team') {
+              const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
+              if (![user.employeeId, ...reporteeIds].includes(rmId)) return res.status(403).json({ message: 'Access denied: RM not in your team' });
+          } else if (scope === 'department') {
+              const rm = await prisma.employee.findUnique({ where: { id: rmId }, select: { departmentId: true } });
+              if (!rm || rm.departmentId !== user.departmentId) return res.status(403).json({ message: 'Access denied: RM from another department' });
+          }
+      }
+      updateData.relationshipManagerId = rmId;
+  }
+
   const project = await (prisma as any).project.update({
     where: { id: Number(id) },
-    data: { 
-      name, 
-      description, 
-      status,
-      leadId: leadId ? String(leadId) : undefined,
-      projectManagerId: projectManagerId !== undefined ? (projectManagerId ? Number(projectManagerId) : null) : undefined,
-      relationshipManagerId: relationshipManagerId !== undefined ? (relationshipManagerId ? Number(relationshipManagerId) : null) : undefined
-    }
+    data: updateData
   });
 
   await logActivity({

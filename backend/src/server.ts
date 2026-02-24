@@ -27,6 +27,15 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 
+// SRE: Brute-force protection for sensitive endpoints
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // 10 attempts per 15 mins
+  message: 'Too many login attempts. Please try again after 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 dotenv.config();
 
 const app = express();
@@ -58,7 +67,7 @@ app.use(cors({
 app.use(express.json());
 app.use(limiter);
 
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/admin', adminRoutes);
@@ -74,8 +83,15 @@ app.use('/api/products', productRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', database: 'connected' });
+app.get('/health', async (req, res) => {
+  try {
+    // SRE: Active DB check
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', database: 'connected', timestamp: new Date() });
+  } catch (err) {
+    console.error('CRITICAL: Health check failed - DB unreachable');
+    res.status(503).json({ status: 'error', database: 'unreachable', message: 'Service unavailable' });
+  }
 });
 
 app.listen(port, () => {

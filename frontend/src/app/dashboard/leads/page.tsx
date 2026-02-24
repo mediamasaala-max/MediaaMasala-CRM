@@ -107,13 +107,12 @@ export default function LeadsPage() {
   const { data: leads = [], isLoading, isFetching, error: queryError } = useQuery<Lead[]>({
     queryKey: ["leads", session?.user?.email, selectedDeptId, selectedEmployeeId, isRecursive],
     queryFn: async () => {
-      let endpoint = "/leads?"
-      if (selectedDeptId !== 'all') endpoint += `departmentId=${selectedDeptId}&`
-      if (selectedEmployeeId !== 'all') {
-        endpoint += `ownerId=${selectedEmployeeId}&`
-        if (isRecursive) endpoint += `recursive=true&`
+      const params: Record<string, string> = {
+        ...(selectedDeptId !== 'all' && { departmentId: selectedDeptId }),
+        ...(selectedEmployeeId !== 'all' && { ownerId: selectedEmployeeId }),
+        recursive: String(isRecursive)
       }
-      const data = await apiClient.get(endpoint)
+      const data = await apiClient.get("/leads", { params })
       return Array.isArray(data) ? data : (data.leads || [])
     },
     enabled: status === "authenticated",

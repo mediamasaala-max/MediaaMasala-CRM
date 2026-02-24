@@ -74,7 +74,7 @@ export const checkPermission = (module: string, action: string) => {
       }
 
       // JWT Hygiene: Real-time check for permission staleness
-      if (user.roleVersion !== undefined && dbUser.employee?.role?.roleVersion !== user.roleVersion) {
+      if (user.roleVersion !== undefined && (dbUser as any).employee?.role?.roleVersion !== user.roleVersion) {
         return res.status(401).json({ 
           message: 'Permissions updated. Please log in again.',
           code: 'TOKEN_STALE',
@@ -82,17 +82,17 @@ export const checkPermission = (module: string, action: string) => {
         });
       }
 
-      if (!dbUser.employee?.role) {
+      if (!(dbUser as any).employee?.role) {
         return next(new AppError('You do not have the necessary permissions to perform this action. No role assigned.', 403));
       }
 
       // 2. Re-check if role was updated to ADMIN
-      if (dbUser.employee.role.code === 'ADMIN') {
+      if ((dbUser as any).employee.role.code === 'ADMIN') {
         (req as any).permissionScope = 'all';
         return next();
       }
 
-      const freshPermissions = dbUser.employee.role.permissions.map((rp: any) => ({
+      const freshPermissions = (dbUser as any).employee.role.permissions.map((rp: any) => ({
         module: rp.permission.module,
         action: rp.permission.action,
         scope: rp.permission.scopeType
