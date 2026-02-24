@@ -137,14 +137,17 @@ export function LayoutShell({ children }: LayoutShellProps) {
 
   // Auto-logout when the backend JWT expires
   useEffect(() => {
-    if ((session as any)?.error === "TokenExpired") {
+    // SECURITY: If the token is expired, sign out.
+    // ADDED GUARD: Do NOT trigger sign out if we are already on the auth pages,
+    // to prevent infinite redirect loops between dashboard and login.
+    if ((session as any)?.error === "TokenExpired" && !pathname.startsWith("/auth")) {
       // Use redirect: true to ensure the page actually refreshes and clears state
       signOut({ 
         callbackUrl: "/auth/login?error=SessionExpired",
         redirect: true 
       });
     }
-  }, [session])
+  }, [session, pathname])
 
   if (pathname.startsWith("/auth")) {
     return <>{children}</>

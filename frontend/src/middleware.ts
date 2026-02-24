@@ -11,6 +11,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // If token is flagged as expired, redirect to login with specific error
+  if ((token as any).error === "TokenExpired") {
+    const loginUrl = new URL("/auth/login?error=SessionExpired", request.url)
+    return NextResponse.redirect(loginUrl)
+  }
+
   return NextResponse.next()
 }
 
