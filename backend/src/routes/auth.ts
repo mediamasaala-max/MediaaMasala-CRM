@@ -238,4 +238,108 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// ─── Profile Endpoint ─── Returns full employee profile for the logged-in user
+router.get('/profile', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Token required' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        employee: {
+          select: {
+            id: true,
+            empId: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            joiningDate: true,
+            isActive: true,
+            department: { select: { id: true, name: true, code: true } },
+            role: { select: { id: true, name: true, code: true } },
+            manager: { select: { id: true, firstName: true, lastName: true, empId: true, email: true } },
+            reportees: { select: { id: true, firstName: true, lastName: true, empId: true }, where: { isActive: true } }
+          }
+        }
+      }
+    });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.employee) return res.status(403).json({ message: 'No employee profile linked' });
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      accountCreated: user.createdAt,
+      employee: {
+        id: user.employee.id,
+        empId: user.employee.empId,
+        firstName: user.employee.firstName,
+        lastName: user.employee.lastName,
+        email: user.employee.email,
+        phone: user.employee.phone,
+        joiningDate: user.employee.joiningDate,
+        isActive: user.employee.isActive,
+        department: user.employee.department,
+        role: user.employee.role,
+        manager: user.employee.manager,
+        teamSize: user.employee.reportees.length,
+        reportees: user.employee.reportees
+      }
+    });
+  } catch (error) {
+    console.error('Profile endpoint error:', error);
+    res.status(401).json({ message: 'Invalid or expired token' });
+  }
+});
+
+// ─── Change Password Endpoint ─── Allows authenticated users to update their own password
+router.patch('/change-password', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Token required' });
+
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Current password and new password are required.' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'New password must be different from the current password.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: decoded.id },
+      data: { passwordHash: hashedNewPassword }
+    });
+
+    res.json({ message: 'Password changed successfully.' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(401).json({ message: 'Invalid or expired token' });
+  }
+});
+
 export default router;

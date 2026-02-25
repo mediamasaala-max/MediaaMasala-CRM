@@ -6,6 +6,7 @@ import { ReactNode, useState, useEffect } from "react"
 import { 
   LayoutDashboard, 
   Users, 
+  User,
   CheckSquare, 
   Settings, 
   LogOut,
@@ -93,13 +94,31 @@ function SidebarContent({ pathname, filteredNav, canSeeSettings, isAdmin, handle
             </Link>
           </div>
         )}
+
+        {/* Account Section - visible to all users */}
+        <div className="space-y-1 pt-4 border-t border-sidebar-border/50">
+          <div className="px-2 mb-2">
+             <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Account</p>
+          </div>
+          <Link
+            href="/dashboard/profile"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
+              pathname === "/dashboard/profile"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-border/10"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <User className={`h-[18px] w-[18px] ${pathname === "/dashboard/profile" ? "text-primary" : "text-muted-foreground/60 group-hover:text-sidebar-accent-foreground"}`} />
+            <span>My Profile</span>
+          </Link>
+        </div>
       </div>
 
       {/* User Info & Logout Footer */}
       <div className="p-3 bg-sidebar border-t border-sidebar-border">
-         <div className="bg-sidebar-accent/50 rounded-lg p-2.5 mb-2 border border-sidebar-border/40">
+         <Link href="/dashboard/profile" className="block bg-sidebar-accent/50 rounded-lg p-2.5 mb-2 border border-sidebar-border/40 hover:bg-sidebar-accent transition-colors cursor-pointer group">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] border border-primary/20">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] border border-primary/20 group-hover:scale-105 transition-transform">
                 {user?.email?.[0].toUpperCase() || "U"}
               </div>
               <div className="flex flex-col min-w-0">
@@ -111,7 +130,7 @@ function SidebarContent({ pathname, filteredNav, canSeeSettings, isAdmin, handle
                 </span>
               </div>
             </div>
-         </div>
+         </Link>
          
          <button 
            onClick={handleLogout}
@@ -239,7 +258,7 @@ export function LayoutShell({ children }: LayoutShellProps) {
            </div>
 
            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50 bg-muted/40 shadow-sm cursor-pointer hover:bg-muted/60 transition-colors">
+              <Link href="/dashboard/profile" className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50 bg-muted/40 shadow-sm cursor-pointer hover:bg-muted/60 transition-colors">
                 <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold text-[9px] border border-primary/20">
                   {user?.email?.[0].toUpperCase() || "U"}
                 </div>
@@ -247,7 +266,7 @@ export function LayoutShell({ children }: LayoutShellProps) {
                   <span className="text-[10px] font-semibold leading-tight truncate text-foreground">{user?.email?.split('@')[0]}</span>
                   <span className="text-[8px] text-muted-foreground/70 font-bold uppercase tracking-tighter">{role || user?.role}</span>
                 </div>
-              </div>
+              </Link>
            </div>
         </header>
 
