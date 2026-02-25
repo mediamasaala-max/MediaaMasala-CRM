@@ -10,6 +10,7 @@ import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import React from "react"
 import { usePermissions } from "@/hooks/use-permissions"
+import { toast } from "sonner"
 
 interface Role {
   id: number
@@ -42,6 +43,7 @@ export default function PermissionMatrixPage() {
   const [matrix, setMatrix] = useState<Record<number, number[]>>({}) // { roleId: [permIds] }
   const [loading, setLoading] = useState(true)
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null)
+  const [isSavingAll, setIsSavingAll] = useState(false)
 
   const fetchData = async () => {
     if (permissionsLoading || !isAdmin) return
@@ -66,31 +68,6 @@ export default function PermissionMatrixPage() {
     if (authStatus === "authenticated" && !permissionsLoading && isAdmin) fetchData()
   }, [authStatus, permissionsLoading, isAdmin])
 
-  if (authStatus === "loading" || (loading && roles.length === 0) || permissionsLoading) {
-    return (
-      <div className="space-y-6 max-w-7xl mx-auto p-6">
-        <div className="flex justify-between border-b pb-6">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <Skeleton className="h-10 w-40" />
-        </div>
-        <div className="border rounded-xl h-[600px] bg-muted/5 flex flex-col p-6 gap-4">
-          <div className="flex gap-4">
-             <Skeleton className="h-12 w-1/4" />
-             <Skeleton className="h-12 w-1/4" />
-             <Skeleton className="h-12 w-1/4" />
-             <Skeleton className="h-12 w-1/4" />
-          </div>
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   const togglePermission = (roleId: number, permId: number) => {
     setMatrix(prev => {
       const currentPerms = prev[roleId] || []
@@ -107,12 +84,24 @@ export default function PermissionMatrixPage() {
       await apiClient.post(`/admin/roles/${roleId}/permissions/sync`, { 
         permissionIds: matrix[roleId] 
       })
-      alert("Permissions successfully updated for " + roles.find(r => r.id === roleId)?.name)
+      toast.success("Permissions updated for " + roles.find(r => r.id === roleId)?.name)
     } catch (err: any) {
       console.error("Error saving perms:", err)
-      alert(err.message || "Failed to save permissions")
     } finally {
       setSavingRoleId(null)
+    }
+  }
+
+  const saveAllPermissions = async () => {
+    if (Object.keys(matrix).length === 0) return
+    setIsSavingAll(true)
+    try {
+      await apiClient.post("/admin/permissions-matrix/batch-sync", { matrix })
+      toast.success("All role permissions updated successfully!")
+    } catch (err: any) {
+      console.error("Error batch saving:", err)
+    } finally {
+      setIsSavingAll(false)
     }
   }
 
@@ -153,18 +142,38 @@ export default function PermissionMatrixPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Label className="text-[10px] font-bold uppercase text-muted-foreground/60 tracking-wider">Filter Dept:</Label>
-          <select
-            value={selectedDeptId}
-            onChange={(e) => setSelectedDeptId(e.target.value)}
-            className="h-9 rounded-lg border border-border/40 bg-card px-4 text-xs font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/40 appearance-none min-w-[160px] text-center"
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Label className="text-[10px] font-bold uppercase text-muted-foreground/60 tracking-wider">Filter Dept:</Label>
+            <select
+              value={selectedDeptId}
+              onChange={(e) => setSelectedDeptId(e.target.value)}
+              className="h-9 rounded-lg border border-border/40 bg-card px-4 text-xs font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/40 appearance-none min-w-[160px] text-center"
+            >
+              <option value="all">🌐 All Departments</option>
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id.toString()}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <Button 
+            onClick={saveAllPermissions}
+            disabled={isSavingAll || loading}
+            variant="default"
+            className="h-9 px-6 bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all rounded-lg"
           >
-            <option value="all">🌐 All Departments</option>
-            {departments.map(dept => (
-              <option key={dept.id} value={dept.id.toString()}>{dept.name}</option>
-            ))}
-          </select>
+            {isSavingAll ? (
+              <>
+                <div className="h-3 w-3 border-2 border-white/20 border-t-white animate-spin rounded-full mr-2" />
+                Saving...
+              </>
+            ) : (
+              <>
+                ✨ Save All Changes
+              </>
+            )}
+          </Button>
         </div>
       </div>
 

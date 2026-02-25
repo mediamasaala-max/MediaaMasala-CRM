@@ -320,7 +320,7 @@ export default function ProductsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold" onClick={fetchProducts}>
+          <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold" onClick={() => fetchProducts()}>
             <RefreshCcw className="mr-2 h-3.5 w-3.5" /> Refresh
           </Button>
         </div>
