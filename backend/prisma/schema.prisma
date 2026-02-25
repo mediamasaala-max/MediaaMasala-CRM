@@ -149,6 +149,7 @@ model Lead {
   @@index([status])
   @@index([source])
   @@index([createdAt])
+  @@index([ownerId, status])
   @@map("leads")
 }
 
@@ -182,6 +183,8 @@ model Task {
   @@index([status])
   @@index([priority])
   @@index([dueDate])
+  @@index([assigneeId, status])
+  @@index([projectId, status])
   @@map("tasks")
 }
 
@@ -352,6 +355,7 @@ model ActivityLog {
   @@index([module])
   @@index([entityId])
   @@index([createdAt])
+  @@index([module, createdAt])
   @@map("activity_logs")
 }
 

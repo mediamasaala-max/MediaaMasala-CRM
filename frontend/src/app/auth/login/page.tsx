@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, Suspense } from "react"
-import { signIn, useSession } from "next-auth/react"
+import { signIn, signOut, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -21,8 +21,12 @@ function LoginForm() {
 
   useEffect(() => {
     // If we are arriving at login because of an error (like SessionExpired),
-    // stop any auto-redirection to the dashboard.
-    if (sessionExpired) return;
+    // force a clean sign out from NextAuth to clear the stale/invalid token
+    // before allowing the user to sign in again.
+    if ((sessionExpired || (session as any)?.error === "TokenExpired") && status !== "unauthenticated") {
+      signOut({ redirect: false })
+      return
+    }
 
     // SECURITY: Only auto-redirect if session is valid AND has no underlying errors
     if (status === "authenticated" && session && !(session as any).error) {

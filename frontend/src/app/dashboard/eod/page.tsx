@@ -20,6 +20,7 @@ import {
   Clock,
   History
 } from "lucide-react"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface EodReport {
   id: number

@@ -5,6 +5,11 @@ import { normalizeScope } from '../types/rbac';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Performance Optimization: In-memory cache for user permissions
+// TTL: 2 minutes to balance speed and security propagation
+const permissionCache = new Map<number, { data: any, timestamp: number }>();
+const CACHE_TTL = 2 * 60 * 1000; 
+
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -14,18 +19,39 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
     if (err) return res.status(401).json({ message: 'Invalid or expired token' });
     
-    // SECURITY PATCH: Fetch full user context including permissions (Consolidated lookup)
     if (user.id) {
+        // Check cache first
+        const cached = permissionCache.get(user.id);
+        const now = Date.now();
+
+        if (cached && (now - cached.timestamp < CACHE_TTL)) {
+            (req as any).fullUser = cached.data;
+            (req as any).user = {
+              ...user,
+              id: user.id,
+              employeeId: cached.data.employee?.id || null,
+              departmentId: cached.data.employee?.departmentId || null,
+              role: cached.data.employee?.role?.code || null
+            };
+            return next();
+        }
+
         const dbUser = await prisma.user.findUnique({ 
           where: { id: user.id }, 
           select: { 
             isActive: true,
             employee: {
-              include: {
+              select: {
+                id: true,
+                departmentId: true,
+                isActive: true,
                 role: {
-                  include: {
+                  select: {
+                    code: true,
                     permissions: {
-                      include: { permission: true }
+                      select: {
+                        permission: true
+                      }
                     }
                   }
                 }
@@ -38,7 +64,9 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
             return res.status(401).json({ message: 'Account is disabled or session invalid' });
         }
 
-        // Cache persistent user data on the request object for downstream use
+        // Update cache
+        permissionCache.set(user.id, { data: dbUser, timestamp: now });
+
         (req as any).fullUser = dbUser;
         (req as any).user = {
           ...user,
