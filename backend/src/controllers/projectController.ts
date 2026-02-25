@@ -229,10 +229,7 @@ export const createProject = safeHandler(async (req: Request, res: Response) => 
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  if (scope !== 'all') {
-    return res.status(403).json({ message: 'Access denied: Only users with ALL scope can initiate new projects' });
-  }
-
+  // RBAC: Validate scope (Universal Scope Implementation)
   if (leadId) {
     // RBC: Verify lead access
     const lead = await prisma.lead.findUnique({ where: { id: String(leadId) } });

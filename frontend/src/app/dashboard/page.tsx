@@ -63,18 +63,22 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { hasModule, hasPermission, getModuleScope, isLoading: permissionsLoading } = usePermissions()
+  const { hasModule, hasPermission, getModuleScope, canView, isLoading: permissionsLoading } = usePermissions()
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard-stats", session?.user?.email],
     queryFn: () => apiClient.get("/dashboard/stats"),
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("dashboard"),
+    staleTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: false,
   })
 
   const { data: activities = [], isLoading: activityLoading, refetch: refetchActivity } = useQuery<ActivityItem[]>({
     queryKey: ["dashboard-activity", session?.user?.email],
     queryFn: () => apiClient.get("/dashboard/activity"),
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("dashboard"),
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnWindowFocus: false,
   })
 
   const canViewLeads = hasModule("leads")

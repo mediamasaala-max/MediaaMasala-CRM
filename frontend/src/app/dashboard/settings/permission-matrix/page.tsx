@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import React from "react"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface Role {
   id: number
@@ -32,7 +33,8 @@ interface Permission {
 }
 
 export default function PermissionMatrixPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status: authStatus } = useSession()
+  const { isAdmin, permissionsLoading } = usePermissions()
   const [roles, setRoles] = useState<Role[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
@@ -42,6 +44,7 @@ export default function PermissionMatrixPage() {
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null)
 
   const fetchData = async () => {
+    if (permissionsLoading || !isAdmin) return
     try {
       setLoading(true)
       const data = await apiClient.get("/admin/permissions-matrix")
@@ -60,10 +63,10 @@ export default function PermissionMatrixPage() {
   }
 
   useEffect(() => {
-    if (session) fetchData()
-  }, [session])
+    if (authStatus === "authenticated" && !permissionsLoading && isAdmin) fetchData()
+  }, [authStatus, permissionsLoading, isAdmin])
 
-  if (status === "loading" || (loading && roles.length === 0)) {
+  if (authStatus === "loading" || (loading && roles.length === 0) || permissionsLoading) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto p-6">
         <div className="flex justify-between border-b pb-6">

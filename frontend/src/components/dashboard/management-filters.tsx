@@ -25,20 +25,19 @@ export function ManagementFilters({
   isRecursive,
   module
 }: ManagementFiltersProps) {
-  const { role, permissions, user } = usePermissions()
+  const { role, permissions, user, isAdmin, isLoading: permissionsLoading } = usePermissions()
   
   // Find current module scope
   const modulePerm = permissions.find((p: any) => p.module === module && (p.action === 'view' || p.action === 'read'))
   const scope = role === 'ADMIN' ? 'all' : (modulePerm?.scopeType || 'own')
 
-  const isAdmin = role === 'ADMIN'
   const isManager = scope === 'department' || scope === 'team' || isAdmin
 
   // Fetch departments - Only for Admin
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: () => apiClient.get("/admin/departments"),
-    enabled: isAdmin
+    enabled: isAdmin && !permissionsLoading
   })
 
   if (!isManager) return null

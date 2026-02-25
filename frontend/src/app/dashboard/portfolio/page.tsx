@@ -16,6 +16,7 @@ import { Plus, Search, Box, Briefcase,
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { usePermissions } from "@/hooks/use-permissions"
 import {
   Dialog,
   DialogContent,
@@ -90,33 +91,47 @@ function PortfolioContent() {
   const [contextTasks, setContextTasks] = useState<Task[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
 
+  const { hasModule, isLoading: permissionsLoading } = usePermissions()
+
   // Data Fetching
   const fetchData = async () => {
+    if (permissionsLoading) return
     setLoading(true)
     try {
-      const [productsData, projectsData] = await Promise.all([
-        apiClient.get("/products"),
-        apiClient.get("/projects")
-      ])
-      setProducts(productsData)
-      setProjects(projectsData)
+      const productsPromise = hasModule("products") 
+        ? apiClient.get("/products").catch(() => []) 
+        : Promise.resolve([])
+        
+      const projectsPromise = hasModule("projects") 
+        ? apiClient.get("/projects").catch(() => []) 
+        : Promise.resolve([])
+
+      const [productsData, projectsData] = await Promise.all([productsPromise, projectsPromise])
+      setProducts(productsData || [])
+      setProjects(projectsData || [])
     } catch (err) {
       console.error("Failed to load portfolio data:", err)
-      toast.error("Failed to load portfolio data")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (!permissionsLoading) {
+      fetchData()
+    }
+  }, [permissionsLoading])
 
   // Fetch Tasks for Context
   useEffect(() => {
-    if (!taskContextItem) return
+    if (!taskContextItem || permissionsLoading) return
 
     const fetchContextTasks = async () => {
+      if (!hasModule("tasks")) {
+        setContextTasks([])
+        return
+      }
+      
       setLoadingTasks(true)
       try {
         const allTasks = await apiClient.get("/tasks")
@@ -130,14 +145,13 @@ function PortfolioContent() {
         setContextTasks(filtered)
       } catch (err) {
         console.error("Failed to fetch tasks:", err)
-        toast.error("Could not load associated tasks")
       } finally {
         setLoadingTasks(false)
       }
     }
 
     fetchContextTasks()
-  }, [taskContextItem])
+  }, [taskContextItem, permissionsLoading, hasModule])
 
 
   // Handlers

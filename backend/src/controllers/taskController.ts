@@ -9,7 +9,7 @@ import { taskSelect } from '../utils/selectUtils';
 export const getTasks = safeHandler(async (req: Request, res: Response) => {
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
-  const { filter, departmentId, assigneeId } = req.query;
+  const { filter, departmentId, assigneeId, projectId, productId } = req.query;
 
   // 1. Apply RBAC Scope using Centralized Utility
   let whereClause = await getModuleWhereClause(user, 'tasks');
@@ -70,7 +70,17 @@ export const getTasks = safeHandler(async (req: Request, res: Response) => {
     }
   }
 
-  // 3. Legacy filter compatibility
+  // 3. Entity Linking Filters
+  if (projectId) {
+    whereClause.projectId = Number(projectId);
+    delete whereClause.OR;
+  }
+  if (productId) {
+    whereClause.productId = Number(productId);
+    delete whereClause.OR;
+  }
+
+  // 4. Legacy filter compatibility
   if (filter === 'my') {
     whereClause.assigneeId = user.employeeId;
     delete whereClause.OR;

@@ -96,140 +96,55 @@ async function main() {
     }
     console.log('✅ Roles seeded');
 
-    // 3. Define Comprehensive Permissions
-    const permissions = [
-      // Leads
-      { module: 'leads', action: 'view', scopeType: 'all' },
-      { module: 'leads', action: 'view', scopeType: 'department' },
-      { module: 'leads', action: 'view', scopeType: 'team' },
-      { module: 'leads', action: 'view', scopeType: 'own' },
-      { module: 'leads', action: 'edit', scopeType: 'all' },
-      { module: 'leads', action: 'edit', scopeType: 'department' },
-      { module: 'leads', action: 'edit', scopeType: 'team' },
-      { module: 'leads', action: 'edit', scopeType: 'own' },
-      { module: 'leads', action: 'create', scopeType: 'all' },
-      { module: 'leads', action: 'create', scopeType: 'department' },
-      { module: 'leads', action: 'create', scopeType: 'team' },
-      { module: 'leads', action: 'create', scopeType: 'own' },
-      { module: 'leads', action: 'assign', scopeType: 'all' },
-      { module: 'leads', action: 'assign', scopeType: 'department' },
-      { module: 'leads', action: 'assign', scopeType: 'team' },
-      { module: 'leads', action: 'delete', scopeType: 'all' },
-      
-      // Tasks
-      { module: 'tasks', action: 'view', scopeType: 'all' },
-      { module: 'tasks', action: 'view', scopeType: 'department' },
-      { module: 'tasks', action: 'view', scopeType: 'team' },
-      { module: 'tasks', action: 'view', scopeType: 'own' },
-      { module: 'tasks', action: 'create', scopeType: 'all' },
-      { module: 'tasks', action: 'create', scopeType: 'department' },
-      { module: 'tasks', action: 'create', scopeType: 'team' },
-      { module: 'tasks', action: 'create', scopeType: 'own' },
-      { module: 'tasks', action: 'edit', scopeType: 'all' },
-      { module: 'tasks', action: 'edit', scopeType: 'department' },
-      { module: 'tasks', action: 'edit', scopeType: 'team' },
-      { module: 'tasks', action: 'edit', scopeType: 'own' },
-      { module: 'tasks', action: 'delete', scopeType: 'all' },
-      { module: 'tasks', action: 'assign', scopeType: 'all' },
-      { module: 'tasks', action: 'assign', scopeType: 'department' },
-      { module: 'tasks', action: 'assign', scopeType: 'team' },
+    // 3. Define Permissions — ONLY actions actually used by backend routes
+    // This map was derived from auditing every checkPermission() call in /routes/*.ts
+    const moduleActionMap: Record<string, string[]> = {
+      leads:      ['view', 'create', 'edit', 'delete', 'assign'],
+      tasks:      ['view', 'create', 'edit', 'delete', 'assign'],
+      projects:   ['view', 'create', 'edit', 'delete'],
+      products:   ['view', 'create', 'edit', 'delete'],
+      attendance: ['view', 'create', 'approve'],
+      leaves:     ['view', 'create', 'approve'],
+      eod:        ['view', 'create', 'edit'],
+      reports:    ['view', 'generate'],
+      employees:  ['view', 'edit', 'manage'],
+      activity:   ['view'],
+      dashboard:  ['view'],
+    };
 
-      
-      // Projects
-      { module: 'projects', action: 'create', scopeType: 'all' },
-      { module: 'projects', action: 'view', scopeType: 'all' },
-      { module: 'projects', action: 'view', scopeType: 'department' },
-      { module: 'projects', action: 'view', scopeType: 'team' },
-      { module: 'projects', action: 'view', scopeType: 'own' },
-      { module: 'projects', action: 'edit', scopeType: 'all' },
-      { module: 'projects', action: 'edit', scopeType: 'department' },
-      { module: 'projects', action: 'edit', scopeType: 'team' },
-      { module: 'projects', action: 'edit', scopeType: 'own' },
-      { module: 'projects', action: 'delete', scopeType: 'all' },
-      
-      // Products
-      { module: 'products', action: 'view', scopeType: 'all' },
-      { module: 'products', action: 'view', scopeType: 'department' },
-      { module: 'products', action: 'view', scopeType: 'own' },
-      { module: 'products', action: 'create', scopeType: 'all' },
-      { module: 'products', action: 'edit', scopeType: 'all' },
-      { module: 'products', action: 'delete', scopeType: 'all' },
-      
-      // EOD
-      { module: 'eod', action: 'view', scopeType: 'all' },
-      { module: 'eod', action: 'view', scopeType: 'department' },
-      { module: 'eod', action: 'view', scopeType: 'team' },
-      { module: 'eod', action: 'view', scopeType: 'own' },
-      { module: 'eod', action: 'create', scopeType: 'own' },
-      
-      // Attendance
-      { module: 'attendance', action: 'view', scopeType: 'all' },
-      { module: 'attendance', action: 'view', scopeType: 'department' },
-      { module: 'attendance', action: 'view', scopeType: 'team' },
-      { module: 'attendance', action: 'view', scopeType: 'own' },
-      { module: 'attendance', action: 'create', scopeType: 'own' },
-      { module: 'attendance', action: 'approve', scopeType: 'all' },
-      { module: 'attendance', action: 'approve', scopeType: 'department' },
-      { module: 'attendance', action: 'approve', scopeType: 'team' },
-      
-      // Employees & Roles
-      { module: 'employees', action: 'view', scopeType: 'all' },
-      { module: 'employees', action: 'view', scopeType: 'department' },
-      { module: 'employees', action: 'view', scopeType: 'team' },
-      { module: 'employees', action: 'view', scopeType: 'own' },
-      { module: 'employees', action: 'manage', scopeType: 'all' }, 
-      { module: 'roles', action: 'manage', scopeType: 'all' },
-      
-      // Dashboard
-      { module: 'dashboard', action: 'view', scopeType: 'all' },
-      { module: 'dashboard', action: 'view', scopeType: 'department' },
-      { module: 'dashboard', action: 'view', scopeType: 'team' },
-      { module: 'dashboard', action: 'view', scopeType: 'own' },
-      
-      // Activity Logs
-      { module: 'activity', action: 'view', scopeType: 'all' },
-      { module: 'activity', action: 'view', scopeType: 'department' },
-      { module: 'activity', action: 'view', scopeType: 'team' },
-      { module: 'activity', action: 'view', scopeType: 'own' },
-      
-      // Leaves
-      { module: 'leaves', action: 'view', scopeType: 'all' },
-      { module: 'leaves', action: 'view', scopeType: 'department' },
-      { module: 'leaves', action: 'view', scopeType: 'team' },
-      { module: 'leaves', action: 'view', scopeType: 'own' },
-      { module: 'leaves', action: 'create', scopeType: 'own' },
-      { module: 'leaves', action: 'approve', scopeType: 'all' },
-      { module: 'leaves', action: 'approve', scopeType: 'department' },
-      { module: 'leaves', action: 'approve', scopeType: 'team' },
-      
-      // Reports
-      { module: 'reports', action: 'generate', scopeType: 'all' },
-      { module: 'reports', action: 'generate', scopeType: 'department' },
-      { module: 'reports', action: 'generate', scopeType: 'team' },
-      { module: 'reports', action: 'generate', scopeType: 'own' },
-      
-      // Leaves
-      { module: 'leaves', action: 'view', scopeType: 'all' },
-      { module: 'leaves', action: 'view', scopeType: 'department' },
-      { module: 'leaves', action: 'view', scopeType: 'team' },
-      { module: 'leaves', action: 'view', scopeType: 'own' },
-      { module: 'leaves', action: 'create', scopeType: 'own' },
-      { module: 'leaves', action: 'edit', scopeType: 'own' },
-      { module: 'leaves', action: 'delete', scopeType: 'own' },
-      { module: 'leaves', action: 'approve', scopeType: 'all' },
-      { module: 'leaves', action: 'approve', scopeType: 'department' },
-      { module: 'leaves', action: 'approve', scopeType: 'team' },
-    ];
+    const scopes = ['own', 'team', 'department', 'all'];
 
-    // Deduplicate permissions
-    const uniquePermissions = Array.from(new Map(permissions.map(p => [`${p.module}-${p.action}-${p.scopeType}`, p])).values());
+    const permissions: any[] = [];
+    for (const [module, actions] of Object.entries(moduleActionMap)) {
+      for (const action of actions) {
+        for (const scopeType of scopes) {
+          permissions.push({ module, action, scopeType });
+        }
+      }
+    }
 
-    console.log(`--- Seeding ${uniquePermissions.length} Unique Permissions ---`);
+    console.log(`--- Seeding ${permissions.length} Targeted Permissions ---`);
     await prisma.permission.createMany({
-      data: uniquePermissions,
+      data: permissions,
       skipDuplicates: true,
     });
     console.log('✅ Permissions seeded');
+
+    // 3b. Cleanup: Remove stale permissions that are no longer in the valid map
+    const validKeys = new Set(permissions.map(p => `${p.module}-${p.action}-${p.scopeType}`));
+    const allExistingPerms = await prisma.permission.findMany();
+    const stalePermIds = allExistingPerms
+      .filter(p => !validKeys.has(`${p.module}-${p.action}-${p.scopeType}`))
+      .map(p => p.id);
+
+    if (stalePermIds.length > 0) {
+      // Remove role-permission mappings first (FK constraint)
+      await prisma.rolePermission.deleteMany({ where: { permissionId: { in: stalePermIds } } });
+      await prisma.permission.deleteMany({ where: { id: { in: stalePermIds } } });
+      console.log(`🧹 Cleaned up ${stalePermIds.length} stale permission rows`);
+    } else {
+      console.log('✅ No stale permissions to clean up');
+    }
 
     // 4. Map Roles to Permissions
     console.log('--- Mapping Roles to Permissions ---');
@@ -254,177 +169,80 @@ async function main() {
 
       const roleMappings: { module: string; action: string; scope: string }[] = [];
 
-      // HEAD_DEPT roles
+      // 1. Universal Baseline (Every employee sees their own data across all modules)
+      const modules = ['leads', 'tasks', 'projects', 'products', 'attendance', 'leaves', 'eod', 'employees', 'activity', 'dashboard', 'reports'];
+      for (const mod of modules) {
+        roleMappings.push({ module: mod, action: 'view', scope: 'own' });
+        // Self-management modules
+        if (['attendance', 'leaves', 'eod'].includes(mod)) {
+          roleMappings.push({ module: mod, action: 'create', scope: 'own' });
+        }
+        // Reports access (own)
+        if (mod === 'reports') {
+          roleMappings.push({ module: mod, action: 'generate', scope: 'own' });
+        }
+      }
+
+      // 2. Department Head Overrides (DEPARTMENT Scope for almost everything)
       if (['SALES_HEAD', 'PROD_HEAD', 'PROJ_HEAD', 'OPS_HEAD'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'leads', action: 'view', scope: 'department' },
-          { module: 'leads', action: 'edit', scope: 'department' },
-          { module: 'leads', action: 'create', scope: 'all' },
-          { module: 'leads', action: 'assign', scope: 'all' },
-          { module: 'leads', action: 'delete', scope: 'all' },
-          { module: 'tasks', action: 'view', scope: 'department' },
-          { module: 'tasks', action: 'create', scope: 'all' },
-          { module: 'tasks', action: 'edit', scope: 'department' },
-          { module: 'tasks', action: 'delete', scope: 'all' },
-          { module: 'tasks', action: 'assign', scope: 'all' },
-          { module: 'projects', action: 'create', scope: 'all' },
-          { module: 'projects', action: 'view', scope: 'department' },
-          { module: 'projects', action: 'edit', scope: 'department' },
-          { module: 'projects', action: 'delete', scope: 'all' },
-          { module: 'products', action: 'view', scope: 'all' },
-          { module: 'products', action: 'edit', scope: 'all' },
-          { module: 'products', action: 'create', scope: 'all' },
-          { module: 'products', action: 'delete', scope: 'all' },
-          { module: 'eod', action: 'view', scope: 'department' },
-          { module: 'eod', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'view', scope: 'department' },
-          { module: 'attendance', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'approve', scope: 'department' },
-          { module: 'employees', action: 'view', scope: 'department' },
-          { module: 'employees', action: 'edit', scope: 'department' },
-          { module: 'reports', action: 'generate', scope: 'department' },
-          { module: 'dashboard', action: 'view', scope: 'department' },
-          { module: 'activity', action: 'view', scope: 'department' },
-        );
+        for (const mod of modules) {
+          roleMappings.push({ module: mod, action: 'view', scope: 'department' });
+          // Heads can also edit/approve in their dept
+          if (['leads', 'tasks', 'projects'].includes(mod)) {
+            roleMappings.push({ module: mod, action: 'edit', scope: 'department' });
+          }
+          if (['attendance', 'leaves'].includes(mod)) {
+            roleMappings.push({ module: mod, action: 'approve', scope: 'department' });
+          }
+          if (mod === 'reports') {
+             roleMappings.push({ module: mod, action: 'generate', scope: 'department' });
+          }
+        }
       }
 
-      // SALES_BM
-      if (role.code === 'SALES_BM') {
-        roleMappings.push(
-          { module: 'leads', action: 'view', scope: 'team' },
-          { module: 'leads', action: 'edit', scope: 'team' },
-          { module: 'leads', action: 'create', scope: 'all' },
-          { module: 'leads', action: 'assign', scope: 'all' },
-          { module: 'tasks', action: 'view', scope: 'team' },
-          { module: 'tasks', action: 'create', scope: 'all' },
-          { module: 'tasks', action: 'edit', scope: 'team' },
-          { module: 'tasks', action: 'assign', scope: 'all' },
-          { module: 'eod', action: 'view', scope: 'team' },
-          { module: 'eod', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'view', scope: 'team' },
-          { module: 'attendance', action: 'create', scope: 'own' },
-          { module: 'reports', action: 'generate', scope: 'team' },
-          { module: 'employees', action: 'view', scope: 'team' },
-          { module: 'dashboard', action: 'view', scope: 'team' },
-          { module: 'activity', action: 'view', scope: 'team' },
-        );
+      // 3. Middle Management (BM/BDM/PM) Overrides (TEAM/DEPARTMENT Scope)
+      if (['SALES_BM', 'SALES_BDM', 'PROD_PM', 'PROJ_PM'].includes(role.code)) {
+        const scopeStr = ['SALES_BM', 'SALES_BDM'].includes(role.code) ? 'team' : 'department'; 
+        for (const mod of modules) {
+           roleMappings.push({ module: mod, action: 'view', scope: scopeStr });
+           if (mod === 'reports') roleMappings.push({ module: mod, action: 'generate', scope: scopeStr });
+           if (['attendance', 'leaves'].includes(mod)) {
+             roleMappings.push({ module: mod, action: 'approve', scope: scopeStr });
+           }
+        }
       }
 
-      // SALES_BDM
+      // 4. Role-Specific Special Permissions
       if (role.code === 'SALES_BDM') {
         roleMappings.push(
-          { module: 'leads', action: 'view', scope: 'team' },
-          { module: 'leads', action: 'edit', scope: 'team' },
           { module: 'leads', action: 'create', scope: 'all' },
           { module: 'leads', action: 'assign', scope: 'all' },
-          { module: 'tasks', action: 'view', scope: 'team' },
           { module: 'tasks', action: 'create', scope: 'all' },
-          { module: 'tasks', action: 'edit', scope: 'team' },
           { module: 'tasks', action: 'assign', scope: 'all' },
-          { module: 'eod', action: 'view', scope: 'team' },
-          { module: 'eod', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'view', scope: 'team' },
-          { module: 'attendance', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'approve', scope: 'team' },
-          { module: 'reports', action: 'generate', scope: 'team' },
-          { module: 'employees', action: 'view', scope: 'team' },
-          { module: 'projects', action: 'view', scope: 'department' },
-          { module: 'dashboard', action: 'view', scope: 'team' },
-          { module: 'activity', action: 'view', scope: 'team' },
         );
       }
 
-      // PROD_PM / PROJ_PM (Project Managers)
-      if (['PROD_PM', 'PROJ_PM'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'tasks', action: 'view', scope: 'department' },
-          { module: 'tasks', action: 'edit', scope: 'department' },
-          { module: 'tasks', action: 'create', scope: 'all' },
-          { module: 'projects', action: 'view', scope: 'department' },
-          { module: 'projects', action: 'edit', scope: 'department' },
-          { module: 'eod', action: 'view', scope: 'department' },
-          { module: 'attendance', action: 'view', scope: 'department' },
-          { module: 'employees', action: 'view', scope: 'department' },
-          { module: 'reports', action: 'generate', scope: 'department' },
-          { module: 'dashboard', action: 'view', scope: 'department' },
-          { module: 'activity', action: 'view', scope: 'department' },
-        );
-      }
-
-      // OPS_MGR (Operations Manager)
       if (role.code === 'OPS_MGR') {
         roleMappings.push(
-          { module: 'attendance', action: 'view', scope: 'department' },
-          { module: 'attendance', action: 'approve', scope: 'department' },
-          { module: 'employees', action: 'view', scope: 'department' },
+          { module: 'employees', action: 'view', scope: 'all' },
           { module: 'employees', action: 'manage', scope: 'all' },
-          { module: 'eod', action: 'view', scope: 'department' },
-          { module: 'reports', action: 'generate', scope: 'department' },
-          { module: 'dashboard', action: 'view', scope: 'department' },
-          { module: 'activity', action: 'view', scope: 'department' },
-        );
-      }
-
-      // Basic Employee Roles
-      if (['SALES_BDE', 'PROD_DEV', 'PROD_TEST', 'PROJ_DEV', 'PROJ_TEST', 'PROD_DESIGNER', 'PROJ_DESIGNER'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'leads', action: 'view', scope: 'own' },
-          { module: 'leads', action: 'edit', scope: 'own' },
-          { module: 'tasks', action: 'view', scope: 'own' },
-          { module: 'tasks', action: 'edit', scope: 'own' },
-          { module: 'eod', action: 'view', scope: 'own' },
-          { module: 'eod', action: 'create', scope: 'own' },
-          { module: 'attendance', action: 'view', scope: 'own' },
-          { module: 'attendance', action: 'create', scope: 'own' },
-          { module: 'employees', action: 'view', scope: 'own' },
-          { module: 'projects', action: 'view', scope: 'own' },
-          { module: 'reports', action: 'generate', scope: 'own' },
-          { module: 'dashboard', action: 'view', scope: 'own' },
-          { module: 'activity', action: 'view', scope: 'own' },
-        );
-      }
-
-      // Add Leaves to all relevant roles
-      if (['SALES_HEAD', 'PROD_HEAD', 'PROJ_HEAD', 'OPS_HEAD'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'leaves', action: 'view', scope: 'department' },
-          { module: 'leaves', action: 'approve', scope: 'department' },
-        );
-      }
-
-      if (['SALES_BM', 'SALES_BDM'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'leaves', action: 'view', scope: 'team' },
-          { module: 'leaves', action: 'approve', scope: 'team' },
-        );
-      }
-
-      if (['PROD_PM', 'PROJ_PM'].includes(role.code)) {
-        roleMappings.push(
-          { module: 'leaves', action: 'view', scope: 'department' },
-          { module: 'leaves', action: 'approve', scope: 'department' },
-        );
-      }
-
-      if (role.code === 'OPS_MGR') {
-        roleMappings.push(
+          { module: 'attendance', action: 'view', scope: 'all' },
+          { module: 'attendance', action: 'approve', scope: 'all' },
           { module: 'leaves', action: 'view', scope: 'all' },
           { module: 'leaves', action: 'approve', scope: 'all' },
         );
       }
 
-      // All employees (including the above) can manage their own leaves
-      roleMappings.push(
-        { module: 'leaves', action: 'view', scope: 'own' },
-        { module: 'leaves', action: 'create', scope: 'own' },
-        { module: 'leaves', action: 'edit', scope: 'own' },
-        { module: 'leaves', action: 'delete', scope: 'own' },
-      );
-
+      // Deduplicate and map to IDs
+      const uniqueCodes = new Set<string>();
       for (const m of roleMappings) {
-        const pId = getPermId(m.module, m.action, m.scope);
-        if (pId) {
-          rolePermMappings.push({ roleId: role.id, permissionId: pId });
+        const key = `${m.module}-${m.action}-${m.scope}`;
+        if (!uniqueCodes.has(key)) {
+          uniqueCodes.add(key);
+          const pId = getPermId(m.module, m.action, m.scope);
+          if (pId) {
+            rolePermMappings.push({ roleId: role.id, permissionId: pId });
+          }
         }
       }
     }
@@ -684,6 +502,91 @@ async function main() {
           });
 
           console.log('✅ RBAC Test scenarios seeded successfully.');
+
+          // 12. Seed Historical Attendance (Last 30 Days)
+          console.log('--- Seeding 30 Days of Historical Attendance ---');
+          const allEmployees = await prisma.employee.findMany();
+          const attendanceData: any[] = [];
+          const now = new Date();
+          
+          for (let i = 1; i <= 30; i++) {
+            const date = new Date();
+            date.setDate(now.getDate() - i);
+            if (date.getDay() === 0) continue; // Skip Sundays
+
+            for (const emp of allEmployees) {
+              const checkIn = new Date(date);
+              checkIn.setHours(9, Math.floor(Math.random() * 30), 0);
+              
+              const checkOut = new Date(date);
+              checkOut.setHours(18, Math.floor(Math.random() * 30), 0);
+
+              attendanceData.push({
+                employeeId: emp.id,
+                date: new Date(date.setHours(0,0,0,0)),
+                checkIn,
+                checkOut,
+                status: Math.random() > 0.1 ? 'Present' : (Math.random() > 0.5 ? 'Late' : 'Half_Day'),
+                location: 'Office'
+              });
+            }
+          }
+          await prisma.attendance.createMany({ data: attendanceData, skipDuplicates: true });
+          console.log('✅ 30 Days of Attendance seeded');
+
+          // 13. Seed EOD Reports (Last 10 Days)
+          console.log('--- Seeding 10 Days of EOD Reports ---');
+          const eodData: any[] = [];
+          for (let i = 1; i <= 10; i++) {
+            const date = new Date();
+            date.setDate(now.getDate() - i);
+            if (date.getDay() === 0) continue;
+
+            for (const emp of allEmployees) {
+              if (Math.random() > 0.3) { // 70% chance of filing EOD
+                eodData.push({
+                  employeeId: emp.id,
+                  date: new Date(date.setHours(0,0,0,0)),
+                  content: `Completed ${Math.floor(Math.random() * 5 + 1)} tasks and followed up with ${Math.floor(Math.random() * 10 + 2)} clients. Everything on track.`,
+                  leadsCount: Math.floor(Math.random() * 5),
+                  tasksCount: Math.floor(Math.random() * 8)
+                });
+              }
+            }
+          }
+          await prisma.eodReport.createMany({ data: eodData });
+          console.log('✅ 10 Days of EOD Reports seeded');
+
+          // 14. Seed Detailed Tasks & Lead Notes
+          console.log('--- Seeding Dense Task & Note Matrix ---');
+          const leads = await prisma.lead.findMany({ take: 50 });
+          const taskData: any[] = [];
+          const noteData: any[] = [];
+
+          for (const lead of leads) {
+              // Add a Task for each lead
+              taskData.push({
+                  title: `Follow up with ${lead.name}`,
+                  description: `Discuss the proposal sent last week regarding ${lead.company}.`,
+                  dueDate: new Date(now.getTime() + (Math.random() * 7 * 24 * 60 * 60 * 1000)),
+                  priority: 'High',
+                  status: 'Pending',
+                  assigneeId: lead.ownerId,
+                  relatedToLeadId: lead.id,
+                  creatorId: adminUser.id
+              });
+
+              // Add a Note for each lead
+              noteData.push({
+                  leadId: lead.id,
+                  authorId: lead.ownerId ?? adminUser.id,
+                  content: `Initial discovery call completed. Client is interested in the ${lead.source} offering.`,
+                  isPrivate: false
+              });
+          }
+          await prisma.task.createMany({ data: taskData });
+          await prisma.leadNote.createMany({ data: noteData });
+          console.log('✅ Task and Note matrix seeded');
       }
     }
 

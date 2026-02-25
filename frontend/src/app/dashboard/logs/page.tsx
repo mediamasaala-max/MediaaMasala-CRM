@@ -12,6 +12,7 @@ import { apiClient } from "@/lib/api-client"
 import { History, Search, Filter, Calendar, User, Activity, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { PermissionGuard } from "@/components/permission-guard"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface ActivityLog {
   id: number
@@ -29,15 +30,18 @@ interface ActivityLog {
 }
 
 export default function LogsPage() {
+  const { data: session, status: authStatus } = useSession()
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const { canView, isLoading: permissionsLoading } = usePermissions()
   const [selectedModule, setSelectedModule] = useState<string>("all")
   const [selectedAction, setSelectedAction] = useState<string>("all")
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all")
 
   const fetchLogs = async (pageNum = 1, moduleFilter?: string) => {
+    if (permissionsLoading || !canView("logs")) return
     setLoading(true)
     try {
       const mod = moduleFilter !== undefined ? moduleFilter : (selectedModule !== "all" ? selectedModule : "")
@@ -54,8 +58,10 @@ export default function LogsPage() {
   }
 
   useEffect(() => {
-    fetchLogs()
-  }, [])
+    if (authStatus === "authenticated" && !permissionsLoading) {
+       fetchLogs()
+    }
+  }, [authStatus, permissionsLoading, canView])
 
   // When module filter changes, re-fetch from API (backend supports module filter)
   const handleModuleChange = (value: string) => {

@@ -65,7 +65,7 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const { hasPermission } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
 
   const canEdit = hasPermission("tasks", "edit")
   const canDelete = hasPermission("tasks", "delete")
@@ -76,7 +76,7 @@ export default function TaskDetailPage() {
   const [tempStatus, setTempStatus] = useState("")
 
   const fetchTask = async () => {
-    if (status !== "authenticated" || !session || !id) return
+    if (status !== "authenticated" || !session || !id || permissionsLoading || !canView("tasks")) return
     
     try {
       const data = await apiClient.get(`/tasks/${id}`)

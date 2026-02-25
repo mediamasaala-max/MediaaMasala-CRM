@@ -14,6 +14,7 @@ import Link from "next/link"
 import { apiClient } from "@/lib/api-client"
 import { Briefcase, Package, ShoppingBag, ArrowRight, User } from "lucide-react"
 import { toast } from "sonner"
+import { usePermissions } from "@/hooks/use-permissions"
 
 const PRIORITIES = ["High", "Medium", "Low"]
 
@@ -26,6 +27,7 @@ function NewTaskContent() {
   const initialLeadId = searchParams?.get("leadId")
   const initialProjectId = searchParams?.get("projectId")
   
+  const { hasModule, canView, isLoading: permissionsLoading } = usePermissions()
   const [loading, setLoading] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(true)
   const [error, setError] = useState("")
@@ -52,29 +54,39 @@ function NewTaskContent() {
 
   useEffect(() => {
     async function fetchData() {
-      if (status !== "authenticated" || !session) return
+      if (status !== "authenticated" || !session || permissionsLoading) return
       
       try {
-        const [leadsData, projectsData, productsData] = await Promise.all([
-          apiClient.get("/leads"),
-          apiClient.get("/projects"),
-          apiClient.get("/products").catch(() => []), // Handle potential error if no seed
-        ])
+        const promises = []
+        
+        if (canView("leads")) promises.push(apiClient.get("/leads").catch(() => []))
+        else promises.push(Promise.resolve([]))
+        
+        if (canView("projects")) promises.push(apiClient.get("/projects").catch(() => []))
+        else promises.push(Promise.resolve([]))
+        
+        if (canView("products")) promises.push(apiClient.get("/products").catch(() => []))
+        else promises.push(Promise.resolve([]))
+
+        const [leadsData, projectsData, productsData] = await Promise.all(promises)
         
         setLeads(leadsData.leads || leadsData || [])
         setProjects(projectsData.projects || projectsData || [])
         setProducts(productsData || [])
 
-        // Separate fetch for employees as it might require admin permissions
-        // If it fails, we simply don't show the assignee dropdown (or show only self if we had that logic, but backing off to self-assign default is fine)
-        try {
-           setLoadingEmployees(true)
-           const employeesData = await apiClient.get("/admin/employees")
-           setAssignees(employeesData.employees || employeesData || [])
-        } catch (e) {
-           console.log("Could not fetch employees (likely permission issue), defaulting to self-assign.")
-        } finally {
-           setLoadingEmployees(false)
+        // Separate fetch for employees as it might require specific permissions
+        if (canView("tasks")) {
+          try {
+             setLoadingEmployees(true)
+             const employeesData = await apiClient.get("/tasks/employees")
+             setAssignees(employeesData.employees || employeesData || [])
+          } catch (e) {
+             console.log("Could not fetch employees (likely permission issue), defaulting to self-assign.")
+          } finally {
+             setLoadingEmployees(false)
+          }
+        } else {
+          setLoadingEmployees(false)
         }
 
       } catch (err) {
@@ -82,7 +94,7 @@ function NewTaskContent() {
       }
     }
     fetchData()
-  }, [session, status])
+  }, [session, status, permissionsLoading, canView])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { apiClient } from "@/lib/api-client"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface Employee {
   id: number
@@ -26,7 +27,8 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
-  const { data: session } = useSession()
+  const { data: session, status: authStatus } = useSession()
+  const { isAdmin, permissionsLoading } = usePermissions()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [pendingUsers, setPendingUsers] = useState<any[]>([])
   const [departments, setDepartments] = useState<any[]>([])
@@ -51,6 +53,7 @@ export default function EmployeesPage() {
   })
 
   const fetchData = async () => {
+    if (permissionsLoading || !isAdmin) return
     try {
       const [empData, pendingData, deptData, roleData] = await Promise.all([
         apiClient.get("/admin/employees"),
@@ -71,8 +74,8 @@ export default function EmployeesPage() {
   }
 
   useEffect(() => {
-    if (session) fetchData()
-  }, [session])
+    if (authStatus === "authenticated" && !permissionsLoading && isAdmin) fetchData()
+  }, [authStatus, permissionsLoading, isAdmin])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

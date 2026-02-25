@@ -39,6 +39,7 @@ import { ManagementFilters } from "@/components/dashboard/management-filters"
 
 export default function EodPage() {
   const { data: session, status } = useSession()
+  const { canView, isLoading: permissionsLoading } = usePermissions()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -66,7 +67,7 @@ export default function EodPage() {
       
       return await apiClient.get(endpoint)
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("eod"),
   })
 
   useEffect(() => {

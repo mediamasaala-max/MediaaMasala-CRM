@@ -77,7 +77,7 @@ interface Task {
 export default function ProjectsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
   
   // Filter State
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
@@ -90,10 +90,8 @@ export default function ProjectsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  // Task Context State
+  // Task Context (Managed by useQuery now)
   const [viewTasksProject, setViewTasksProject] = useState<Project | null>(null)
-  const [contextTasks, setContextTasks] = useState<Task[]>([])
-  const [loadingTasks, setLoadingTasks] = useState(false)
 
   // Employee list for PM/RM selector
   const [employees, setEmployees] = useState<any[]>([])
@@ -114,43 +112,30 @@ export default function ProjectsPage() {
       }
       return await apiClient.get(endpoint)
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("projects"),
   })
 
-  // Fetch Tasks for Context
-  useEffect(() => {
-    if (!viewTasksProject) return
-
-    const fetchProjectTasks = async () => {
-      setLoadingTasks(true)
-      try {
-        const allTasks = await apiClient.get("/tasks")
-        const tasks = Array.isArray(allTasks) ? allTasks : allTasks.tasks || []
-        const filtered = tasks.filter((t: Task) => t.project?.id === viewTasksProject.id)
-        setContextTasks(filtered)
-      } catch (err) {
-        console.error("Failed to fetch project tasks:", err)
-        toast.error("Could not load associated tasks")
-      } finally {
-        setLoadingTasks(false)
-      }
-    }
-
-    fetchProjectTasks()
-  }, [viewTasksProject])
+  // Fetch Tasks for Context (Optimized with server-side filtering)
+  const { data: contextTasks = [], isLoading: loadingTasks } = useQuery<Task[]>({
+    queryKey: ["project-tasks", viewTasksProject?.id],
+    queryFn: () => apiClient.get(`/tasks?projectId=${viewTasksProject?.id}`),
+    enabled: !!viewTasksProject,
+    staleTime: 30 * 1000,
+  })
 
   // Fetch employees for PM selector
   useEffect(() => {
     const fetchEmployees = async () => {
+      if (!canView("projects")) return
       try {
-        const data = await apiClient.get("/leads/employees")
+        const data = await apiClient.get("/projects/employees")
         setEmployees(Array.isArray(data) ? data : [])
       } catch (err) {
         console.error("Failed to fetch employees:", err)
       }
     }
-    if (session) fetchEmployees()
-  }, [session])
+    if (session && !permissionsLoading) fetchEmployees()
+  }, [session, permissionsLoading, canView])
   
   // Sync form states when editingProject changes
   useEffect(() => {

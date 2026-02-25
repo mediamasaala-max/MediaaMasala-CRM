@@ -138,7 +138,7 @@ export default function LeadDetailPage() {
   }
 
   const fetchEmployees = async () => {
-    if (status !== "authenticated" || !session) return
+    if (status !== "authenticated" || !session || !canAssign) return
     try {
       const data = await apiClient.get(`/leads/employees`)
       setEmployees(data)

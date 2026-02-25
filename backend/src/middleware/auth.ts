@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
+import { normalizeScope } from '../types/rbac';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -13,20 +14,41 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
     if (err) return res.status(401).json({ message: 'Invalid or expired token' });
     
-    // SECURITY PATCH: Quick check for active status if user.id is in token
+    // SECURITY PATCH: Fetch full user context including permissions (Consolidated lookup)
     if (user.id) {
-        const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { isActive: true } });
+        const dbUser = await prisma.user.findUnique({ 
+          where: { id: user.id }, 
+          select: { 
+            isActive: true,
+            employee: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: { permission: true }
+                    }
+                  }
+                }
+              }
+            }
+          } 
+        });
+
         if (!dbUser || !dbUser.isActive) {
-            return res.status(401).json({ message: 'Account is disabled or does not exist' });
+            return res.status(401).json({ message: 'Account is disabled or session invalid' });
         }
+
+        // Cache persistent user data on the request object for downstream use
+        (req as any).fullUser = dbUser;
+        (req as any).user = {
+          ...user,
+          id: user.id,
+          employeeId: dbUser.employee?.id || null,
+          departmentId: dbUser.employee?.departmentId || null,
+          role: dbUser.employee?.role?.code || null
+        };
     }
 
-    (req as any).user = {
-      ...user,
-      id: user.id || null,
-      employeeId: user.employeeId || null,
-      departmentId: user.departmentId || null,
-    };
     next();
   });
 };
@@ -41,81 +63,58 @@ export const checkPermission = (module: string, action: string) => {
       return next(new AppError('Access denied: No user session', 403));
     }
 
-    // ADMIN bypass
-    if (user.role === 'ADMIN') {
-      (req as any).permissionScope = 'all';
-      return next();
-    }
-
     try {
-      // 1. Fetch fresh permissions via the Employee profile (Schema Audit 6)
-      const dbUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: {
-          isActive: true,
-          employee: {
-            select: {
-              role: {
-                select: {
-                  code: true,
-                  roleVersion: true,
-                  permissions: {
-                    include: { permission: true }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
+      // 1. Re-use the consolidated User context pre-fetched in authenticateToken
+      const dbUser = (req as any).fullUser;
+
+      if (!dbUser) {
+          return res.status(401).json({ message: 'Session context lost. Please re-authenticate.' });
+      }
 
       if (!dbUser || !dbUser.isActive) {
           return res.status(401).json({ message: 'Account is disabled or session invalid' });
       }
 
-      // JWT Hygiene: Real-time check for permission staleness
-      if (user.roleVersion !== undefined && (dbUser as any).employee?.role?.roleVersion !== user.roleVersion) {
-        return res.status(401).json({ 
-          message: 'Permissions updated. Please log in again.',
-          code: 'TOKEN_STALE',
-          refreshRequired: true 
-        });
-      }
+      const roleCode = (dbUser as any).employee?.role?.code;
 
-      if (!(dbUser as any).employee?.role) {
-        return next(new AppError('You do not have the necessary permissions to perform this action. No role assigned.', 403));
-      }
-
-      // 2. Re-check if role was updated to ADMIN
-      if ((dbUser as any).employee.role.code === 'ADMIN') {
+      // 2. ADMIN bypass (Using DB value, NOT token value)
+      if (roleCode === 'ADMIN') {
         (req as any).permissionScope = 'all';
         return next();
       }
 
+      if (!roleCode || !(dbUser as any).employee?.role?.permissions) {
+        return next(new AppError('Unauthorized: No active role or permissions assigned.', 403));
+      }
+
+      // 3. Resolve and Normalize Permissions
       const freshPermissions = (dbUser as any).employee.role.permissions.map((rp: any) => ({
         module: rp.permission.module,
         action: rp.permission.action,
-        scope: rp.permission.scopeType
+        scope: normalizeScope(rp.permission.scopeType)
       }));
 
+      // 4. Match Action (with Aliases for backwards compatibility & consistency)
+      // Standardize: view, create, edit, delete, assign, approve, generate, manage
+      const actionAliases: Record<string, string[]> = {
+        'view': ['view', 'read'],
+        'edit': ['edit', 'write', 'manage', 'update'],
+        'delete': ['delete', 'manage'],
+        'create': ['create', 'add'],
+        'manage': ['manage', 'edit', 'delete']
+      };
+
+      const allowedActions = actionAliases[action] || [action];
+
       const relevantPermissions = freshPermissions.filter(
-        (p: any) => p.module === module && (p.action === action || (action === 'view' && p.action === 'read'))
+        (p: any) => p.module === module && allowedActions.includes(p.action)
       );
       
       if (relevantPermissions.length === 0) {
-        const actionMap: Record<string, string> = {
-          'view': 'view this content',
-          'create': 'create new items',
-          'edit': 'make changes',
-          'delete': 'delete items',
-          'assign': 'assign items'
-        };
-        
-        const readableAction = actionMap[action] || action;
-        return next(new AppError(`You don't have permission to ${readableAction} in ${module}.`, 403));
+        return next(new AppError(`Access Forbidden: Missing '${action}' permission for module '${module}'.`, 403));
       }
 
-      // Pick the most permissive scope
+      // 5. Pick the most permissive scope (all > department > team > own)
       const scopeOrder = ['all', 'department', 'team', 'own'];
       relevantPermissions.sort((a: any, b: any) => 
         scopeOrder.indexOf(a.scope) - scopeOrder.indexOf(b.scope)
@@ -123,15 +122,15 @@ export const checkPermission = (module: string, action: string) => {
       
       const permission = relevantPermissions[0];
 
-
-      // Attach permission scope to request for controller filtering
+      // Attach permission details to request for downstream controllers & filters
       (req as any).permissionScope = permission.scope;
-      // Also attach all fresh permissions so controllers can use them
       (req as any).user.permissions = freshPermissions;
+      (req as any).user.role = roleCode; // Update role in req object if it changed in DB
+
       next();
     } catch (error) {
-      console.error('Permission check error:', error);
-      return next(new AppError('Error checking permissions', 500));
+      console.error('RBAC Engine Error:', error);
+      return next(new AppError('Internal Security Exception', 500));
     }
   };
 };

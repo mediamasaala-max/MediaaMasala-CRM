@@ -29,8 +29,8 @@ interface Department {
 }
 
 export default function RolesPage() {
-  const { data: session } = useSession()
-  const { hasPermission } = usePermissions()
+  const { data: session, status: authStatus } = useSession()
+  const { hasPermission, permissionsLoading } = usePermissions()
   const [roles, setRoles] = useState<Role[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +45,7 @@ export default function RolesPage() {
   const [isActive, setIsActive] = useState(true)
 
   const fetchData = async () => {
+    if (permissionsLoading || !hasPermission("roles", "view")) return
     try {
       const [rolesData, deptsData] = await Promise.all([
         apiClient.get("/admin/roles"),
@@ -60,8 +61,8 @@ export default function RolesPage() {
   }
 
   useEffect(() => {
-    if (session) fetchData()
-  }, [session])
+    if (authStatus === "authenticated" && !permissionsLoading && hasPermission("roles", "view")) fetchData()
+  }, [authStatus, permissionsLoading, hasPermission])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

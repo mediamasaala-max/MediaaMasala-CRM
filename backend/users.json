@@ -1,0 +1,142 @@
+[
+  {
+    "email": "sales.bdm1@test.com",
+    "role": "SALES_BDM"
+  },
+  {
+    "email": "sales.bdm2@test.com",
+    "role": "SALES_BDM"
+  },
+  {
+    "email": "sales.bde1a@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde1b@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde1c@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde1d@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde2a@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde2b@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde2c@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "sales.bde2d@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "prod.hod@test.com",
+    "role": "PROD_HEAD"
+  },
+  {
+    "email": "prod.pm1@test.com",
+    "role": "PROD_PM"
+  },
+  {
+    "email": "prod.dev1@test.com",
+    "role": "PROD_DEV"
+  },
+  {
+    "email": "prod.test1@test.com",
+    "role": "PROD_TEST"
+  },
+  {
+    "email": "prod.design1@test.com",
+    "role": "PROD_DESIGNER"
+  },
+  {
+    "email": "prod.pm2@test.com",
+    "role": "PROD_PM"
+  },
+  {
+    "email": "prod.dev2@test.com",
+    "role": "PROD_DEV"
+  },
+  {
+    "email": "prod.test2@test.com",
+    "role": "PROD_TEST"
+  },
+  {
+    "email": "prod.design2@test.com",
+    "role": "PROD_DESIGNER"
+  },
+  {
+    "email": "proj.hod@test.com",
+    "role": "PROJ_HEAD"
+  },
+  {
+    "email": "proj.pm1@test.com",
+    "role": "PROJ_PM"
+  },
+  {
+    "email": "proj.dev1@test.com",
+    "role": "PROJ_DEV"
+  },
+  {
+    "email": "proj.test1@test.com",
+    "role": "PROJ_TEST"
+  },
+  {
+    "email": "proj.design1@test.com",
+    "role": "PROJ_DESIGNER"
+  },
+  {
+    "email": "proj.pm2@test.com",
+    "role": "PROJ_PM"
+  },
+  {
+    "email": "proj.dev2@test.com",
+    "role": "PROJ_DEV"
+  },
+  {
+    "email": "proj.test2@test.com",
+    "role": "PROJ_TEST"
+  },
+  {
+    "email": "proj.design2@test.com",
+    "role": "PROJ_DESIGNER"
+  },
+  {
+    "email": "charlie.ops@media-masala.com",
+    "role": "OPS_HEAD"
+  },
+  {
+    "email": "staff.a1@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "staff.a2@test.com",
+    "role": "SALES_BDE"
+  },
+  {
+    "email": "staff.b1@test.com",
+    "role": "PROD_PM"
+  },
+  {
+    "email": "superadmin@media-masala.com",
+    "role": "ADMIN"
+  },
+  {
+    "email": "sales.hod@test.com",
+    "role": "SALES_HEAD"
+  },
+  {
+    "email": "sales.bm@test.com",
+    "role": "SALES_BM"
+  }
+]

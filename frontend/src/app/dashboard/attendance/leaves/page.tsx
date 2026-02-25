@@ -47,11 +47,11 @@ interface LeaveRequest {
 
 export default function LeavesPage() {
   const { data: session, status } = useSession()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
   const [isSubmitOpen, setIsSubmitOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  const canApprove = hasPermission("attendance", "approve")
+  const canApprove = hasPermission("leaves", "approve")
   const [activeTab, setActiveTab] = useState<'my' | 'team'>(canApprove ? 'team' : 'my')
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
@@ -83,7 +83,7 @@ export default function LeavesPage() {
       }
       return await apiClient.get(endpoint)
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("attendance"),
   })
 
   const handleSubmitLeave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -134,7 +134,7 @@ export default function LeavesPage() {
   })
 
   return (
-    <PermissionGuard module="attendance">
+    <PermissionGuard module="leaves">
       <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border/40">
@@ -180,7 +180,7 @@ export default function LeavesPage() {
             {/* Management Filters */}
             {activeTab === 'team' && (
               <ManagementFilters 
-                module="attendance"
+                module="leaves"
                 selectedDept={selectedDeptId}
                 setSelectedDept={setSelectedDeptId}
                 selectedEmp={selectedEmployeeId}

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Search, Box, MoreHorizontal, Pencil, Trash2, ListTodo, Loader2, Users, RefreshCcw } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -109,12 +110,19 @@ const getProductStatusColor = (status: string) => {
 
 export default function ProductsPage() {
   const { data: session, status } = useSession()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
   const router = useRouter()
   
-  const [products, setProducts] = useState<Product[]>([])
+  const { data: products = [], isLoading, isFetching, refetch: fetchProducts } = useQuery<Product[]>({
+    queryKey: ["products"],
+    queryFn: () => apiClient.get("/products"),
+    enabled: status === "authenticated" && !permissionsLoading && canView("products"),
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  // Local state for employees remains as it's a one-time setup typically
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -128,24 +136,20 @@ export default function ProductsPage() {
   const [formStatus, setFormStatus] = useState<string>("Active")
 
   const [viewTasksProduct, setViewTasksProduct] = useState<Product | null>(null)
-  const [contextTasks, setContextTasks] = useState<Task[]>([])
-  const [loadingTasks, setLoadingTasks] = useState(false)
 
-  const fetchProducts = async () => {
-    setLoading(true)
-    try {
-      const data = await apiClient.get("/products")
-      setProducts(data)
-    } catch (err) {
-      console.error("Failed to load products:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Associated Tasks (Optimized via server-side filtering)
+  const { data: contextTasks = [], isLoading: loadingTasks } = useQuery<Task[]>({
+    queryKey: ["product-tasks", viewTasksProduct?.id],
+    queryFn: () => apiClient.get(`/tasks?productId=${viewTasksProduct?.id}`),
+    enabled: !!viewTasksProduct,
+    staleTime: 30 * 1000,
+  })
+
 
   const fetchEmployees = async () => {
+    if (!canView("products")) return
     try {
-      const data = await apiClient.get("/leads/employees")
+      const data = await apiClient.get("/products/employees")
       setEmployees(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error("Failed to load employees:", err)
@@ -153,11 +157,10 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
-    if (status === "authenticated") {
-      fetchProducts()
+    if (status === "authenticated" && !permissionsLoading) {
       fetchEmployees()
     }
-  }, [status])
+  }, [status, permissionsLoading, canView])
 
   useEffect(() => {
     if (editingProduct) {
@@ -171,23 +174,6 @@ export default function ProductsPage() {
     }
   }, [editingProduct])
 
-  useEffect(() => {
-    if (!viewTasksProduct) return
-    const fetchProductTasks = async () => {
-      setLoadingTasks(true)
-      try {
-        const allTasks = await apiClient.get("/tasks")
-        const tasks = Array.isArray(allTasks) ? allTasks : allTasks.tasks || []
-        const filtered = tasks.filter((t: Task) => t.product?.id === viewTasksProduct.id)
-        setContextTasks(filtered)
-      } catch (err) {
-        console.error("Failed to fetch product tasks:", err)
-      } finally {
-        setLoadingTasks(false)
-      }
-    }
-    fetchProductTasks()
-  }, [viewTasksProduct])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -223,14 +209,12 @@ export default function ProductsPage() {
   const handleDelete = async () => {
     if (!productToDelete) return
     const id = productToDelete.id
-    const originalProducts = [...products]
-    setProducts(prev => prev.filter(p => p.id !== id))
     setDeletingId(id)
     try {
       await apiClient.delete(`/products/${id}`)
       toast.success("Product deleted")
+      fetchProducts()
     } catch (err: any) {
-      setProducts(originalProducts)
       toast.error("Failed to delete product")
     } finally {
       setDeletingId(null)
@@ -342,11 +326,11 @@ export default function ProductsPage() {
         </div>
 
         <div className="h-0.5 w-full bg-muted overflow-hidden">
-          {loading && <div className="h-full bg-primary animate-pulse w-full" />}
+          {(isLoading || isFetching) && <div className="h-full bg-primary animate-pulse w-full" />}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {loading ? (
+          {isLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
               <Card key={i} className="shadow-none border border-border/40">
                 <CardHeader className="pb-2">

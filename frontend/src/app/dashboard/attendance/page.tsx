@@ -10,6 +10,7 @@ import { Clock, MapPin, CheckCircle2, LogOut, Calendar as CalendarIcon, History 
 import { toast } from "sonner"
 import { PermissionGuard } from "@/components/permission-guard"
 import { useQuery } from "@tanstack/react-query"
+import { usePermissions } from "@/hooks/use-permissions"
 import { ManagementFilters } from "@/components/dashboard/management-filters"
 import { PageSkeleton } from "@/components/dashboard/page-skeleton"
 
@@ -31,6 +32,7 @@ interface AttendanceRecord {
 
 export default function AttendancePage() {
   const { data: session, status } = useSession()
+  const { hasModule, canView, isLoading: permissionsLoading } = usePermissions()
   const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
@@ -67,7 +69,7 @@ export default function AttendancePage() {
       }
       return await apiClient.get(endpoint)
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("attendance"),
   })
 
   const activeRecord = records.find((r: AttendanceRecord) => {

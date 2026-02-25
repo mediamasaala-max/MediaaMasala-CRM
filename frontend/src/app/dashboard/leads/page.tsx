@@ -97,7 +97,7 @@ export default function LeadsPage() {
   const [localLeads, setLocalLeads] = useState<Lead[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [view, setView] = useState<ViewType>("list")
-  const { hasPermission, isLoading: permissionsLoading } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
   
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all")
@@ -115,7 +115,9 @@ export default function LeadsPage() {
       const data = await apiClient.get("/leads", { params })
       return Array.isArray(data) ? data : (data.leads || [])
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("leads"),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: false,
   })
 
   useEffect(() => {

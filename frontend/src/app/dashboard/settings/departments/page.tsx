@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { apiClient } from "@/lib/api-client"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface Department {
   id: number
@@ -19,7 +20,8 @@ interface Department {
 }
 
 export default function DepartmentsPage() {
-  const { data: session } = useSession()
+  const { data: session, status: authStatus } = useSession()
+  const { isAdmin, permissionsLoading } = usePermissions()
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -32,6 +34,7 @@ export default function DepartmentsPage() {
   const [isActive, setIsActive] = useState(true)
 
   const fetchDepartments = async () => {
+    if (permissionsLoading || !isAdmin) return
     try {
       const data = await apiClient.get("/admin/departments")
       setDepartments(data)
@@ -43,8 +46,8 @@ export default function DepartmentsPage() {
   }
 
   useEffect(() => {
-    if (session) fetchDepartments()
-  }, [session])
+    if (authStatus === "authenticated" && !permissionsLoading && isAdmin) fetchDepartments()
+  }, [authStatus, permissionsLoading, isAdmin])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

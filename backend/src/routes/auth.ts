@@ -71,8 +71,9 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.employee.role.code,
         roleVersion: (user.employee.role as any).roleVersion || 1,
-        departmentId: user.employee.departmentId,
-        permissions: permissions
+        departmentId: user.employee.departmentId
+        // RBAC: Permissions removed from token to prevent "HTTP 431: Request Header Fields Too Large"
+        // The checkPermission middleware fetches fresh permissions from the DB on every request.
       },
       JWT_SECRET,
       { expiresIn: '48h' }
@@ -195,7 +196,11 @@ router.get('/me', async (req, res) => {
     if (!user.isActive) return res.status(401).json({ message: 'Account is disabled' });
     if (!user.employee) return res.status(403).json({ message: 'No employee profile' });
 
-    // JWT Hygiene: Check Role Version
+    // OPTIMIZATION: Seamless Permission Updates
+    // We no longer force a logout when roleVersion changes because the 
+    // authenticateToken/checkPermission middleware now fetches fresh 
+    // permissions from the DB in real-time.
+    /* 
     if (decoded.roleVersion !== undefined && (user.employee.role as any).roleVersion !== decoded.roleVersion) {
       return res.status(401).json({ 
         message: 'Permissions updated. Please log in again.',
@@ -203,6 +208,7 @@ router.get('/me', async (req, res) => {
         refreshRequired: true 
       });
     }
+    */
 
     const permissions = user.employee.role.permissions.map(rp => ({
       module: rp.permission.module,

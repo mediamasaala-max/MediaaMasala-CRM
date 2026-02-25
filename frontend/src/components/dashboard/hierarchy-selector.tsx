@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { useSession } from "next-auth/react"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface EmployeeNode {
   id: number
@@ -44,13 +45,15 @@ export function HierarchySelector({
   isRecursive 
 }: HierarchySelectorProps) {
   const { data: session } = useSession()
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions()
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<number, boolean>>({})
   const [search, setSearch] = useState("")
 
   const { data: hierarchy = [], isLoading } = useQuery<EmployeeNode[]>({
     queryKey: ["employee-hierarchy"],
-    queryFn: () => apiClient.get("/admin/hierarchy-tree")
+    queryFn: () => apiClient.get("/admin/hierarchy-tree"),
+    enabled: hasPermission("employees", "view") && !permissionsLoading
   })
 
   // Auto-expand the selected path or first level

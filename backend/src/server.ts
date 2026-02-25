@@ -32,8 +32,8 @@ const limiter = rateLimit({
 // SRE: Brute-force protection for sensitive endpoints
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10, // 10 attempts per 15 mins
-  message: 'Too many login attempts. Please try again after 15 minutes.',
+  max: 30, // Increased for development/testing
+  message: { message: 'Too many login attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

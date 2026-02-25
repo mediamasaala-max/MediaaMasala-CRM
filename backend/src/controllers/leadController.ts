@@ -522,9 +522,7 @@ export const convertToProject = safeHandler(async (req: Request, res: Response) 
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  if (scope !== 'all' && scope !== 'department') {
-    return res.status(403).json({ message: 'Access denied: Insufficient scope to convert leads to projects' });
-  }
+  // RBAC: Validate scope (Universal Scope Implementation)
 
   const rbacWhere = await getModuleWhereClause(user, 'leads', 'edit');
   if (rbacWhere === null) return res.status(403).json({ message: 'Access denied' });

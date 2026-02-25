@@ -19,20 +19,23 @@ export async function getModuleWhereClause(
   if (user.role === 'ADMIN') return {};
 
   const permissions = user.permissions || [];
+  
+  // Standard Action Aliases (Sync with checkPermission middleware)
+  const actionAliases: Record<string, string[]> = {
+    'view': ['view', 'read'],
+    'edit': ['edit', 'write', 'manage', 'update'],
+    'delete': ['delete', 'manage'],
+    'create': ['create', 'add'],
+    'manage': ['manage', 'edit', 'delete']
+  };
+
+  const allowedActions = actionAliases[action] || [action];
+
   const permission = permissions.find(
-    (p: any) => p.module === moduleName && (
-      p.action === action || 
-      (action === 'view' && p.action === 'read') ||
-      (action === 'edit' && p.action === 'write') ||
-      (action === 'delete' && p.action === 'edit') // Users with edit can often delete
-    )
+    (p: any) => p.module === moduleName && allowedActions.includes(p.action)
   );
 
   if (!permission) return null; // Explicitly deny if no permission
-
-  // PRODUCT HYGIENE: Products are global catalog. 
-  // View action is always 'all' scope regardless of initial assignment.
-  if (moduleName === 'products' && action === 'view') return {};
 
   // Normalize legacy scope values ('assigned' → 'own')
   const scope = normalizeScope(permission.scope);
@@ -64,6 +67,10 @@ export async function getModuleWhereClause(
     }
     if (moduleName === 'employees') return { id: user.employeeId };
     if (moduleName === 'activity') return { employeeId: user.employeeId };
+    if (moduleName === 'reports' || moduleName === 'dashboard') return { employeeId: user.employeeId };
+    
+    // Safety fallback for 'own' scope on unhandled modules
+    return { employeeId: user.employeeId };
   }
 
   // ─── TEAM Scope (Recursive) ─────────────────────────────────────────
@@ -103,6 +110,10 @@ export async function getModuleWhereClause(
     }
     if (moduleName === 'employees') return { id: { in: teamIds } };
     if (moduleName === 'activity') return { employeeId: { in: teamIds } };
+    if (moduleName === 'reports' || moduleName === 'dashboard') return { employeeId: { in: teamIds } };
+
+    // Safety fallback for 'team' scope
+    return { employeeId: { in: teamIds } };
   }
 
   // ─── DEPARTMENT Scope ───────────────────────────────────────────────
@@ -139,6 +150,10 @@ export async function getModuleWhereClause(
     }
     if (moduleName === 'employees') return { departmentId: user.departmentId };
     if (moduleName === 'activity') return { employee: { departmentId: user.departmentId } };
+    if (moduleName === 'reports' || moduleName === 'dashboard') return { employee: { departmentId: user.departmentId } };
+
+    // Safety fallback for 'department' scope
+    return { departmentId: user.departmentId };
   }
 
   // ─── ALL Scope ──────────────────────────────────────────────────────

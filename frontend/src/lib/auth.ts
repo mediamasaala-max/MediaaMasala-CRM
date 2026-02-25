@@ -28,9 +28,16 @@ export const authOptions: NextAuthOptions = {
             headers: { "Content-Type": "application/json" }
           })
 
+          // Safety check: NextAuth authorize must return an object or null
+          if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Login failed:", res.status, errorText);
+            return null;
+          }
+
           const data = await res.json()
 
-          if (res.ok && data.user) {
+          if (data.user) {
             return {
               ...data.user,
               id: data.user.id,
@@ -51,10 +58,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = user.role;
         token.department = user.department;
-        token.permissions = user.permissions;
         token.accessToken = user.token;
         token.employeeId = user.employee?.id;
-        token.employee = user.employee;
         // Record when backend JWT expires
         token.tokenExpiry = Date.now() + JWT_EXPIRY_HOURS * 60 * 60 * 1000;
         delete token.error; // Clear any previous errors on fresh login
@@ -71,10 +76,8 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.role = token.role;
         session.user.department = token.department;
-        session.user.permissions = token.permissions;
         session.user.accessToken = token.accessToken;
         session.user.employeeId = token.employeeId;
-        session.user.employee = token.employee;
       }
       // Expose error to client so SessionGuard can react
       session.error = token.error;

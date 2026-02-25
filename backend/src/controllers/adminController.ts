@@ -56,9 +56,15 @@ export const createEmployee = safeHandler(async (req: Request, res: Response) =>
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  // SCOPE CHECK: Only 'all' can create in any dept.
-  if (scope !== 'all') {
-    return res.status(403).json({ message: 'Access denied: Only users with ALL scope can onboard new employees' });
+  // SCOPE CHECK (Universal Scope Implementation)
+  if (scope === 'department' && Number(departmentId) !== user.departmentId) {
+    return res.status(403).json({ message: 'Access denied: You can only onboard employees for your own department' });
+  }
+  if (scope === 'own') {
+    return res.status(403).json({ message: 'Access denied: Direct employees cannot onboard others' });
+  }
+  if (scope === 'team') {
+     // team scope for onboarding usually doesn't make sense unless it's a sub-department, but we'll allow it if the manager is in the team
   }
   
   // Validate that departmentId is provided
@@ -245,13 +251,23 @@ export const deleteEmployee = safeHandler(async (req: Request, res: Response) =>
     const user = (req as any).user;
     const scope = (req as any).permissionScope;
 
-    if (scope !== 'all') {
-        return res.status(403).json({ message: 'Access denied: Only admins can delete/deactivate employees' });
-    }
-
     const employeeId = Number(id);
     const existingEmp = await prisma.employee.findUnique({ where: { id: employeeId } });
     if (!existingEmp) return res.status(404).json({ message: 'Employee not found' });
+
+    // SCOPE CHECK (Universal Scope Implementation)
+    if (scope === 'department' && existingEmp.departmentId !== user.departmentId) {
+        return res.status(403).json({ message: 'Access denied: You can only deactivate employees in your own department' });
+    }
+    if (scope === 'team') {
+        const reporteeIds = await getRecursiveReporteeIds(user.employeeId);
+        if (existingEmp.id !== user.employeeId && !reporteeIds.includes(existingEmp.id)) {
+            return res.status(403).json({ message: 'Access denied: Employee is not in your team' });
+        }
+    }
+    if (scope === 'own' && existingEmp.id !== user.employeeId) {
+        return res.status(403).json({ message: 'Access denied: You cannot deactivate other employees' });
+    }
 
     // SOFT DELETE Logic
     await prisma.$transaction(async (tx) => {
@@ -317,8 +333,9 @@ export const createDepartment = safeHandler(async (req: Request, res: Response) 
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  if (scope !== 'all') {
-    return res.status(403).json({ message: 'Access denied: Requires system-wide scope' });
+  // SCOPE CHECK (Universal Scope Implementation)
+  if (scope !== 'all' && scope !== 'department') {
+    return res.status(403).json({ message: 'Access denied: Requires system-wide or department scope' });
   }
   const department = await prisma.department.create({
     data: { name, code, description }
@@ -342,8 +359,12 @@ export const updateDepartment = safeHandler(async (req: Request, res: Response) 
   const user = (req as any).user;
   const scope = (req as any).permissionScope;
 
-  if (scope !== 'all') {
-    return res.status(403).json({ message: 'Access denied: Requires system-wide scope' });
+  // SCOPE CHECK (Universal Scope Implementation)
+  if (scope === 'department' && Number(id) !== user.departmentId) {
+    return res.status(403).json({ message: 'Access denied: You can only update your own department' });
+  }
+  if (scope !== 'all' && scope !== 'department') {
+    return res.status(403).json({ message: 'Access denied: Requires system-wide or department scope' });
   }
   const department = await prisma.department.update({
     where: { id: Number(id) },
@@ -400,8 +421,12 @@ export const createRole = safeHandler(async (req: Request, res: Response) => {
 
   const targetDeptId = departmentId ? Number(departmentId) : null;
 
-  if (scope !== 'all') {
-      return res.status(403).json({ message: 'Access denied: Only users with ALL scope can create new roles' });
+  // SCOPE CHECK (Universal Scope Implementation)
+  if (scope === 'department' && targetDeptId !== user.departmentId) {
+      return res.status(403).json({ message: 'Access denied: You can only create roles for your own department' });
+  }
+  if (scope === 'own' || scope === 'team') {
+      return res.status(403).json({ message: 'Access denied: Insufficient scope to create roles' });
   }
 
   const role = await prisma.role.create({

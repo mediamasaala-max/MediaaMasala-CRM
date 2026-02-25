@@ -141,7 +141,7 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('all')
   const [view, setView] = useState<ViewType>("list")
-  const { hasPermission, isLoading: permissionsLoading } = usePermissions()
+  const { hasPermission, canView, isLoading: permissionsLoading } = usePermissions()
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all")
   const [isRecursive, setIsRecursive] = useState<boolean>(false)
@@ -161,7 +161,9 @@ export default function TasksPage() {
       const data = await apiClient.get("/tasks", { params })
       return Array.isArray(data) ? data : (data.tasks || [])
     },
-    enabled: status === "authenticated",
+    enabled: status === "authenticated" && !permissionsLoading && canView("tasks"),
+    staleTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: false,
   })
 
   const canCreate = hasPermission("tasks", "create")

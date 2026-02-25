@@ -16,8 +16,9 @@ export function usePermissions() {
       return await apiClient.get('/auth/me');
     },
     enabled: !!accessToken,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes (Permissions are stable)
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false, // Prevent redundant calls when switching tabs
     initialData: user?.permissions ? { permissions: user.permissions, user: user } : undefined,
   })
 
@@ -67,7 +68,8 @@ export function usePermissions() {
     isAdmin: role === 'ADMIN',
     refreshPermissions: refetch,
     permissions,
-    isLoading: status === "loading" || isLoading
+    isLoading: status === "loading" || isLoading,
+    permissionsLoading: status === "loading" || isLoading
   }), [hasPermission, hasModule, getModuleScope, canView, canCreate, canEdit, canDelete, canAssign, role, refetch, permissions, isLoading, status, data?.user, user])
 }
 
