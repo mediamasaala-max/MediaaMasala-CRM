@@ -405,6 +405,9 @@ enum LeaveType {
   Casual
   Annual
   Unpaid
+  Vacation
+  Personal
+  Other
 }
 
 enum LeaveStatus {
